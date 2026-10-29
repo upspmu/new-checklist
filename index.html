@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NBMC Checklist Logic</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&family=Gelasio:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#00316B; --blue80:#335a89; --blue40:#99adc4; --blue20:#ccd6e1; --blue10:#e6ebf0;
+  --yellow:#FFD400; --yellow20:#fff7cc; --yellow10:#fffbe6;
+  --fg2:#4a5a72; --fg3:#8090a4; --border:#dde3ea; --soft:#f5f7fa;
+  --orange:#b8521f; --orangebg:#fdeee7; --teal:#0a7a4f; --tealbg:#e3f6ee; --purple:#7030A0; --purplebg:#f1e8f8;
+  --head:"Cabin","Gill Sans MT","Segoe UI",sans-serif; --body:"Gelasio","Cambria",Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--soft);color:#14233a;font-family:var(--body);-webkit-font-smoothing:antialiased}
+header{background:var(--blue);color:#fff;padding:32px 16px 28px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+.kicker{font:700 12px var(--head);letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+h1{font:700 32px/1.1 var(--head);text-transform:uppercase;letter-spacing:.02em;margin:10px 0 8px}
+.sub{font-size:15px;color:#cfdaea;max-width:760px;line-height:1.5}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 14px;min-width:120px}
+.stat b{display:block;font:700 24px var(--head);color:var(--yellow)}
+.stat span{font:400 12px var(--head);color:#cfdaea}
+
+.tlabel{font:600 12px var(--head);color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.seg{display:inline-flex;border:1px solid var(--blue);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:#fff;color:var(--blue);font:600 13px var(--head);padding:8px 12px;cursor:pointer;border-right:1px solid var(--blue20)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--blue);color:#fff}
+.chk{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--head);color:var(--blue);cursor:pointer}
+.chk input{accent-color:var(--blue);width:16px;height:16px}
+
+main{padding:28px 0 60px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font:400 12.5px var(--head);color:var(--fg2);margin-bottom:24px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* flow nodes */
+.node{display:flex;justify-content:center}
+.pill-node{background:var(--blue);color:#fff;font:700 14px var(--head);padding:10px 22px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+.pill-node.end{background:var(--yellow);color:var(--blue)}
+.arrow{display:flex;justify-content:center;height:34px;position:relative}
+.arrow::before{content:"";width:2px;background:var(--blue40);height:100%}
+.arrow::after{content:"";position:absolute;bottom:0;border:6px solid transparent;border-top:8px solid var(--blue40);border-bottom:0}
+
+.gate{background:#fff;border:2px solid var(--blue);border-radius:10px;padding:16px 18px;max-width:760px;margin:0 auto}
+.gate h3{font:700 14px var(--head);color:var(--blue);margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;display:flex;gap:8px;align-items:center}
+.gate h3 .dia{width:14px;height:14px;background:var(--yellow);transform:rotate(45deg);border:2px solid var(--blue)}
+.paths{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.path{border:1px solid var(--border);border-radius:6px;padding:10px 12px;font:400 12.5px/1.45 var(--head);color:var(--fg2);background:var(--soft)}
+.path b{display:block;color:var(--blue);font-size:13px;margin-bottom:3px}
+
+.section{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,49,107,.06);overflow:hidden}
+.section.dim{opacity:.4}
+.shead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,var(--blue10),#fff)}
+.step{flex:none;width:38px;height:38px;border-radius:8px;background:var(--yellow);color:var(--blue);font:700 16px/38px var(--head);text-align:center}
+.stitle{font:700 18px/1.2 var(--head);color:var(--blue)}
+.smeta{font:400 12.5px var(--head);color:var(--fg2);margin-top:2px}
+.sbody{padding:10px 18px 16px}
+.sbody.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lane{border:1px dashed var(--blue40);border-radius:8px;padding:10px 12px}
+.lane.dim{opacity:.4}
+.lane-h{font:700 12.5px var(--head);color:var(--blue);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+
+.q{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid #eef1f5}
+.q:last-child{border-bottom:0}
+.q.na{opacity:.35}
+.qn{font:700 12px/22px var(--head);color:var(--blue);background:var(--blue10);border-radius:4px;text-align:center}
+.qt{font:400 14px/1.45 var(--body);text-wrap:pretty}
+.opts{font:400 12px/1.45 var(--head);color:var(--fg3);margin-top:3px}
+.flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.flag{font:600 11px var(--head);padding:2px 7px;border-radius:3px}
+.f-ups{background:var(--orangebg);color:var(--orange)}
+.f-det{background:var(--blue10);color:var(--blue)}
+.f-key{background:var(--yellow);color:var(--blue)}
+.f-opt{background:#eef1f5;color:var(--fg2)}
+.type{font:600 11px/22px var(--head);color:var(--fg2);white-space:nowrap;padding:0 8px;border-radius:999px;border:1px solid var(--border)}
+.t-yn{color:var(--blue);border-color:var(--blue20)}
+.t-photo{color:var(--teal);border-color:#b9e6d3;background:var(--tealbg)}
+.t-multi{color:var(--purple);border-color:#dcc6ee;background:var(--purplebg)}
+
+.branch{margin:0 0 0 22px;padding:2px 0 2px 22px;border-left:2px dashed var(--blue40);position:relative}
+.branch .q{background:var(--yellow10)}
+.cond{display:inline-block;font:700 11px var(--head);color:var(--blue);background:var(--yellow);padding:2px 8px;border-radius:3px;margin:8px 0 0 -10px;position:relative}
+.cond::before{content:"";position:absolute;left:-14px;top:50%;width:12px;border-top:2px dashed var(--blue40)}
+.ro{font:400 13.5px/1.5 var(--body);color:var(--fg2);background:var(--soft);border-radius:6px;padding:12px 14px;margin-top:6px}
+.ro b{color:var(--blue);font-family:var(--head)}
+.hidden-opts .opts{display:none}
+
+footer{font:400 12px var(--head);color:var(--fg3);text-align:center;padding:20px}
+@media (max-width:720px){
+  h1{font-size:24px}
+  .paths,.sbody.cols{grid-template-columns:1fr}
+  .q{grid-template-columns:40px minmax(0,1fr)}
+  .q .type{grid-column:2;justify-self:start}
+  .count{margin-left:0}
+}
+@media print{.toc,.filters{display:none}body{background:#fff}.section,.kpi{box-shadow:none}}
+.toc{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 4px rgba(0,49,107,.06)}
+.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px}
+.toc a{flex:none;font:600 13px var(--head);color:var(--blue);text-decoration:none;padding:7px 12px;border-radius:5px}
+.toc a:hover{background:var(--blue10)}
+.block{scroll-margin-top:60px;margin-bottom:56px}
+.eyebrow{font:700 12px var(--head);letter-spacing:.14em;text-transform:uppercase;color:#b88f00}
+h2{font:700 28px/1.15 var(--head);color:var(--blue);margin:6px 0 0}
+.yrule{width:56px;height:4px;background:var(--yellow);border-radius:2px;margin:12px 0 20px}
+.lead{font-size:16px;line-height:1.55;color:var(--fg2);max-width:780px;margin:0 0 16px}
+.pipeline{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.pstep{background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font:400 12.5px/1.45 var(--head);color:var(--fg2);position:relative}
+.pstep span{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font:700 12px/22px var(--head);text-align:center;margin-bottom:6px}
+.pstep b{display:block;color:var(--blue);font-size:14px;margin-bottom:3px}
+.formula{margin-top:14px;background:var(--blue);color:#fff;border-radius:8px;padding:14px 18px;font:400 15px/1.5 var(--head)}
+.formula b{color:var(--yellow)}
+.bands{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.bands .tlabel{margin-right:6px}
+.bnd{display:inline-block;font:700 12.5px var(--head);padding:5px 10px;border-radius:5px}
+.b-red{background:#ff0000;color:#fff}.b-orange{background:#ff9900;color:#1a1a1a}.b-yellow{background:#ffff00;color:#1a1a1a}.b-green{background:#00b050;color:#fff}
+.tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;font:400 14px var(--head)}
+.tbl th{background:var(--blue);color:#fff;text-align:left;font:700 12.5px var(--head);letter-spacing:.04em;text-transform:uppercase;padding:11px 14px}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl tr:nth-child(even) td{background:var(--soft)}
+.tbl td.c,.tbl th:nth-child(n+3){text-align:center}
+.tbl td.small{font-size:12.5px;line-height:1.5;color:var(--fg2)}
+.tbl tr.tot td{background:var(--yellow20);font-weight:700;color:var(--blue)}
+.tbl a{color:var(--blue);text-decoration:none}
+.na{color:var(--fg3)}
+.qref{display:inline-block;font:700 12px var(--head);color:var(--blue);background:var(--blue10);border-radius:4px;padding:2px 7px;text-decoration:none}
+.qref:hover{background:var(--yellow)}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.kpi{background:#fff;border:1px solid var(--border);border-top:4px solid var(--blue);border-radius:10px;padding:16px 18px;scroll-margin-top:60px}
+.kpi:target{box-shadow:0 0 0 3px var(--yellow)}
+.kpi-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.kpi-name{font:700 17px var(--head);color:var(--blue)}
+.kpi-scope{font:400 12px var(--head);color:var(--fg2);margin-top:2px}
+.kpi-w{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.kpi-w span{font:400 12px var(--head);color:var(--fg2);background:var(--yellow20);padding:2px 8px;border-radius:4px;white-space:nowrap}
+.kpi-w b{color:var(--blue);font-size:14px}
+.kq{margin-top:10px}
+.kq-h{display:flex;gap:8px;align-items:flex-start;font:400 14px/1.45 var(--body)}
+.kq-where{font:400 11.5px var(--head);color:var(--fg3);margin:4px 0 6px 0}
+.opt-tbl{width:100%;border-collapse:collapse;font:400 12.5px/1.4 var(--head)}
+.opt-tbl td{padding:6px 8px;border-top:1px solid #eef1f5}
+.opt-tbl td.sc{width:44px;text-align:center;font-weight:700;border-radius:4px}
+.s0{background:#fde3e3;color:#a10000}.s1,.s2{background:#fde3e3;color:#a10000}.s3,.s4{background:#fff0dc;color:#9a5a00}.s5,.s6{background:#fffbd0;color:#6b6100}.s7,.s8,.s9,.s10{background:#dff5e8;color:#0a7a4f}
+.kpi-f{margin-top:10px;font:400 12.5px/1.5 var(--head);color:var(--fg2);background:var(--soft);border-radius:6px;padding:8px 10px}
+.kpi-f b{color:var(--blue)}
+.filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:18px}
+.filters[hidden]{display:none}
+.tlabel{font:600 12px var(--head);color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.q.is-kpi{background:#e7f1fb;border-left:3px solid var(--blue);padding-left:8px;margin-left:-11px;border-radius:4px}
+.branch .q.is-kpi{background:#e7f1fb}
+.kpi-badge{font:700 11px var(--head);color:#fff;background:var(--blue);padding:3px 8px;border-radius:3px;text-decoration:none}
+.kpi-badge:hover{background:var(--yellow);color:var(--blue)}
+.kcount{color:var(--blue)}
+.q{scroll-margin-top:70px}
+.q:target{box-shadow:0 0 0 3px var(--yellow)}
+.issues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.issue{display:flex;gap:12px;background:#fff;border:1px solid var(--border);border-left:4px solid var(--yellow);border-radius:8px;padding:12px 14px}
+.issue>span{flex:none;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font:700 12px/24px var(--head);text-align:center}
+.issue b{font:700 14px var(--head);color:var(--blue)}
+.issue p{margin:4px 0 0;font:400 13.5px/1.5 var(--body);color:#14233a}
+@media (max-width:820px){.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis,.issues{grid-template-columns:1fr}.tbl{font-size:12.5px}.tbl th,.tbl td{padding:8px}}
+@media (max-width:820px){.tbl{display:block;overflow-x:auto;white-space:normal}.toc .wrap{scrollbar-width:none}.kpi-h{flex-wrap:wrap}}
+
+:root{
+  --blue:#00316B; --blue80:#335a89; --blue40:#99adc4; --blue20:#ccd6e1; --blue10:#e6ebf0;
+  --yellow:#FFD400; --yellow20:#fff7cc; --yellow10:#fffbe6;
+  --fg2:#4a5a72; --fg3:#8090a4; --border:#dde3ea; --soft:#f5f7fa;
+  --orange:#b8521f; --orangebg:#fdeee7; --teal:#0a7a4f; --tealbg:#e3f6ee; --purple:#7030A0; --purplebg:#f1e8f8;
+  --head:"Cabin","Gill Sans MT","Segoe UI",sans-serif; --body:"Gelasio","Cambria",Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--soft);color:#14233a;font-family:var(--body);-webkit-font-smoothing:antialiased}
+header{background:var(--blue);color:#fff;padding:32px 16px 28px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+.kicker{font:700 12px var(--head);letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+h1{font:700 32px/1.1 var(--head);text-transform:uppercase;letter-spacing:.02em;margin:10px 0 8px}
+.sub{font-size:15px;color:#cfdaea;max-width:760px;line-height:1.5}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 14px;min-width:120px}
+.stat b{display:block;font:700 24px var(--head);color:var(--yellow)}
+.stat span{font:400 12px var(--head);color:#cfdaea}
+
+.tlabel{font:600 12px var(--head);color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.seg{display:inline-flex;border:1px solid var(--blue);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:#fff;color:var(--blue);font:600 13px var(--head);padding:8px 12px;cursor:pointer;border-right:1px solid var(--blue20)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--blue);color:#fff}
+.chk{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--head);color:var(--blue);cursor:pointer}
+.chk input{accent-color:var(--blue);width:16px;height:16px}
+
+main{padding:28px 0 60px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font:400 12.5px var(--head);color:var(--fg2);margin-bottom:24px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* flow nodes */
+.node{display:flex;justify-content:center}
+.pill-node{background:var(--blue);color:#fff;font:700 14px var(--head);padding:10px 22px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+.pill-node.end{background:var(--yellow);color:var(--blue)}
+.arrow{display:flex;justify-content:center;height:34px;position:relative}
+.arrow::before{content:"";width:2px;background:var(--blue40);height:100%}
+.arrow::after{content:"";position:absolute;bottom:0;border:6px solid transparent;border-top:8px solid var(--blue40);border-bottom:0}
+
+.gate{background:#fff;border:2px solid var(--blue);border-radius:10px;padding:16px 18px;max-width:760px;margin:0 auto}
+.gate h3{font:700 14px var(--head);color:var(--blue);margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;display:flex;gap:8px;align-items:center}
+.gate h3 .dia{width:14px;height:14px;background:var(--yellow);transform:rotate(45deg);border:2px solid var(--blue)}
+.paths{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.path{border:1px solid var(--border);border-radius:6px;padding:10px 12px;font:400 12.5px/1.45 var(--head);color:var(--fg2);background:var(--soft)}
+.path b{display:block;color:var(--blue);font-size:13px;margin-bottom:3px}
+
+.section{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,49,107,.06);overflow:hidden}
+.section.dim{opacity:.4}
+.shead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,var(--blue10),#fff)}
+.step{flex:none;width:38px;height:38px;border-radius:8px;background:var(--yellow);color:var(--blue);font:700 16px/38px var(--head);text-align:center}
+.stitle{font:700 18px/1.2 var(--head);color:var(--blue)}
+.smeta{font:400 12.5px var(--head);color:var(--fg2);margin-top:2px}
+.sbody{padding:10px 18px 16px}
+.sbody.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lane{border:1px dashed var(--blue40);border-radius:8px;padding:10px 12px}
+.lane.dim{opacity:.4}
+.lane-h{font:700 12.5px var(--head);color:var(--blue);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+
+.q{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid #eef1f5}
+.q:last-child{border-bottom:0}
+.q.na{opacity:.35}
+.qn{font:700 12px/22px var(--head);color:var(--blue);background:var(--blue10);border-radius:4px;text-align:center}
+.qt{font:400 14px/1.45 var(--body);text-wrap:pretty}
+.opts{font:400 12px/1.45 var(--head);color:var(--fg3);margin-top:3px}
+.flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.flag{font:600 11px var(--head);padding:2px 7px;border-radius:3px}
+.f-ups{background:var(--orangebg);color:var(--orange)}
+.f-det{background:var(--blue10);color:var(--blue)}
+.f-key{background:var(--yellow);color:var(--blue)}
+.f-opt{background:#eef1f5;color:var(--fg2)}
+.type{font:600 11px/22px var(--head);color:var(--fg2);white-space:nowrap;padding:0 8px;border-radius:999px;border:1px solid var(--border)}
+.t-yn{color:var(--blue);border-color:var(--blue20)}
+.t-photo{color:var(--teal);border-color:#b9e6d3;background:var(--tealbg)}
+.t-multi{color:var(--purple);border-color:#dcc6ee;background:var(--purplebg)}
+
+.branch{margin:0 0 0 22px;padding:2px 0 2px 22px;border-left:2px dashed var(--blue40);position:relative}
+.branch .q{background:var(--yellow10)}
+.cond{display:inline-block;font:700 11px var(--head);color:var(--blue);background:var(--yellow);padding:2px 8px;border-radius:3px;margin:8px 0 0 -10px;position:relative}
+.cond::before{content:"";position:absolute;left:-14px;top:50%;width:12px;border-top:2px dashed var(--blue40)}
+.ro{font:400 13.5px/1.5 var(--body);color:var(--fg2);background:var(--soft);border-radius:6px;padding:12px 14px;margin-top:6px}
+.ro b{color:var(--blue);font-family:var(--head)}
+.hidden-opts .opts{display:none}
+
+footer{font:400 12px var(--head);color:var(--fg3);text-align:center;padding:20px}
+@media (max-width:720px){
+  h1{font-size:24px}
+  .paths,.sbody.cols{grid-template-columns:1fr}
+  .q{grid-template-columns:40px minmax(0,1fr)}
+  .q .type{grid-column:2;justify-self:start}
+  .count{margin-left:0}
+}
+@media print{.toc,.filters{display:none}body{background:#fff}.section,.kpi{box-shadow:none}}
+.toc{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 4px rgba(0,49,107,.06)}
+.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:8px;padding-bottom:8px}
+.toc a{flex:none;font:600 13px var(--head);color:var(--blue);text-decoration:none;padding:7px 12px;border-radius:5px}
+.toc a:hover{background:var(--blue10)}
+.block{scroll-margin-top:60px;margin-bottom:56px}
+.eyebrow{font:700 12px var(--head);letter-spacing:.14em;text-transform:uppercase;color:#b88f00}
+h2{font:700 28px/1.15 var(--head);color:var(--blue);margin:6px 0 0}
+.yrule{width:56px;height:4px;background:var(--yellow);border-radius:2px;margin:12px 0 20px}
+.lead{font-size:16px;line-height:1.55;color:var(--fg2);max-width:780px;margin:0 0 16px}
+.pipeline{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.pstep{background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font:400 12.5px/1.45 var(--head);color:var(--fg2);position:relative}
+.pstep span{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font:700 12px/22px var(--head);text-align:center;margin-bottom:6px}
+.pstep b{display:block;color:var(--blue);font-size:14px;margin-bottom:3px}
+.formula{margin-top:14px;background:var(--blue);color:#fff;border-radius:8px;padding:14px 18px;font:400 15px/1.5 var(--head)}
+.formula b{color:var(--yellow)}
+.bands{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.bands .tlabel{margin-right:6px}
+.bnd{display:inline-block;font:700 12.5px var(--head);padding:5px 10px;border-radius:5px}
+.b-red{background:#ff0000;color:#fff}.b-orange{background:#ff9900;color:#1a1a1a}.b-yellow{background:#ffff00;color:#1a1a1a}.b-green{background:#00b050;color:#fff}
+.tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;font:400 14px var(--head)}
+.tbl th{background:var(--blue);color:#fff;text-align:left;font:700 12.5px var(--head);letter-spacing:.04em;text-transform:uppercase;padding:11px 14px}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl tr:nth-child(even) td{background:var(--soft)}
+.tbl td.c,.tbl th:nth-child(n+3){text-align:center}
+.tbl td.small{font-size:12.5px;line-height:1.5;color:var(--fg2)}
+.tbl tr.tot td{background:var(--yellow20);font-weight:700;color:var(--blue)}
+.tbl a{color:var(--blue);text-decoration:none}
+.na{color:var(--fg3)}
+.qref{display:inline-block;font:700 12px var(--head);color:var(--blue);background:var(--blue10);border-radius:4px;padding:2px 7px;text-decoration:none}
+.qref:hover{background:var(--yellow)}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.kpi{background:#fff;border:1px solid var(--border);border-top:4px solid var(--blue);border-radius:10px;padding:16px 18px;scroll-margin-top:60px}
+.kpi:target{box-shadow:0 0 0 3px var(--yellow)}
+.kpi-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.kpi-name{font:700 17px var(--head);color:var(--blue)}
+.kpi-scope{font:400 12px var(--head);color:var(--fg2);margin-top:2px}
+.kpi-w{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.kpi-w span{font:400 12px var(--head);color:var(--fg2);background:var(--yellow20);padding:2px 8px;border-radius:4px;white-space:nowrap}
+.kpi-w b{color:var(--blue);font-size:14px}
+.kq{margin-top:10px}
+.kq-h{display:flex;gap:8px;align-items:flex-start;font:400 14px/1.45 var(--body)}
+.kq-where{font:400 11.5px var(--head);color:var(--fg3);margin:4px 0 6px 0}
+.opt-tbl{width:100%;border-collapse:collapse;font:400 12.5px/1.4 var(--head)}
+.opt-tbl td{padding:6px 8px;border-top:1px solid #eef1f5}
+.opt-tbl td.sc{width:44px;text-align:center;font-weight:700;border-radius:4px}
+.s0{background:#fde3e3;color:#a10000}.s1,.s2{background:#fde3e3;color:#a10000}.s3,.s4{background:#fff0dc;color:#9a5a00}.s5,.s6{background:#fffbd0;color:#6b6100}.s7,.s8,.s9,.s10{background:#dff5e8;color:#0a7a4f}
+.kpi-f{margin-top:10px;font:400 12.5px/1.5 var(--head);color:var(--fg2);background:var(--soft);border-radius:6px;padding:8px 10px}
+.kpi-f b{color:var(--blue)}
+.filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:18px}
+.filters[hidden]{display:none}
+.tlabel{font:600 12px var(--head);color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.q.is-kpi{background:#e7f1fb;border-left:3px solid var(--blue);padding-left:8px;margin-left:-11px;border-radius:4px}
+.branch .q.is-kpi{background:#e7f1fb}
+.kpi-badge{font:700 11px var(--head);color:#fff;background:var(--blue);padding:3px 8px;border-radius:3px;text-decoration:none}
+.kpi-badge:hover{background:var(--yellow);color:var(--blue)}
+.kcount{color:var(--blue)}
+.q{scroll-margin-top:70px}
+.q:target{box-shadow:0 0 0 3px var(--yellow)}
+.issues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.issue{display:flex;gap:12px;background:#fff;border:1px solid var(--border);border-left:4px solid var(--yellow);border-radius:8px;padding:12px 14px}
+.issue>span{flex:none;width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font:700 12px/24px var(--head);text-align:center}
+.issue b{font:700 14px var(--head);color:var(--blue)}
+.issue p{margin:4px 0 0;font:400 13.5px/1.5 var(--body);color:#14233a}
+@media (max-width:820px){.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis,.issues{grid-template-columns:1fr}.tbl{font-size:12.5px}.tbl th,.tbl td{padding:8px}}
+@media (max-width:820px){.tbl{display:block;overflow-x:auto;white-space:normal}.toc .wrap{scrollbar-width:none}.kpi-h{flex-wrap:wrap}}
+
+.q.is-op{background:#e3f6ee;border-left:3px solid var(--teal);padding-left:8px;margin-left:-11px;border-radius:4px}
+.branch .q.is-op{background:#e3f6ee}
+.op-badge{font:700 11px var(--head);color:#fff;background:var(--teal);padding:3px 8px;border-radius:3px;text-decoration:none}
+.op-badge:hover{background:var(--yellow);color:var(--blue)}
+.f-sys{background:var(--tealbg);color:var(--teal)}
+.yn-y{background:#dff5e8;color:#0a7a4f;font-weight:700;text-align:center;width:72px;border-radius:4px}
+.yn-n{background:#fde3e3;color:#a10000;font-weight:700;text-align:center;width:72px;border-radius:4px}
+.kpi.op{border-top-color:var(--teal)}
+.chk-row{display:flex;gap:16px;flex-wrap:wrap}
+.pipeline.p7{grid-template-columns:repeat(7,minmax(0,1fr))}
+.tbl td.l{text-align:left!important}
+.ok{color:#0a7a4f;font-weight:700}.no{color:#a10000;font-weight:700}
+.placeholder{border:2px dashed var(--blue40);border-radius:8px;padding:12px 14px;font:400 13.5px/1.5 var(--head);color:var(--fg2);background:var(--soft)}
+@media (max-width:820px){.pipeline.p7{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.switch{background:#001f45;color:#fff}
+.switch .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+.switch .lbl{font:700 11px var(--head);letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.switch button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 13px var(--head);padding:7px 14px;border-radius:6px;cursor:pointer}
+.switch button.on{background:var(--yellow);color:var(--blue);border-color:var(--yellow)}
+.app[hidden]{display:none}
+</style></head><body>
+<div class="switch"><div class="wrap"><span class="lbl">NBMC checklist logic</span>
+<button data-app="g" class="on">Gunvatta · classroom practice</button><button data-app="b">Balvatika · FFB and operational</button></div></div>
+<div class="app" id="app-g">
+<header><div class="wrap">
+  <div class="kicker">Revamped Gunvatta Checklist (Rev 21.09) · NBMC mapping (16 Oct 2026)</div>
+  <h1>Gunvatta checklist and NBMC dashboard logic</h1>
+  <div class="sub">How a mentor’s Gunvatta observation becomes NBMC classroom-practice KPIs: which questions are scored, how each answer converts to points, the weights, and where each question sits in the checklist flow.</div>
+  <div class="stats">
+    <div class="stat"><b>89</b><span>checklist questions</span></div>
+    <div class="stat"><b>10</b><span>questions feed NBMC</span></div>
+    <div class="stat"><b>7</b><span>KPI themes · Class 1–5</span></div>
+    <div class="stat"><b>8</b><span>KPI themes · Class 6–8</span></div>
+    <div class="stat"><b>0–10</b><span>composite score</span></div>
+  </div>
+</div></header>
+<nav class="toc"><div class="wrap">
+  <a href="#model">1 · Scoring model</a><a href="#kpis">2 · KPIs and weights</a><a href="#detail">3 · KPI logic</a><a href="#example">4 · Worked example</a><a href="#flow">5 · Question flow</a><a href="#open">6 · Open points</a>
+</div></nav>
+<main><div class="wrap">
+
+<section id="model" class="block">
+  <div class="eyebrow">1 · Scoring model</div><h2>From one visit to a dashboard score</h2><div class="yrule"></div>
+  <div class="pipeline">
+    <div class="pstep"><span>1</span><b>Mentor visit</b>Fills the Gunvatta checklist for one observed class.</div>
+    <div class="pstep"><span>2</span><b>Pick framework</b>Q6 class observed: Class 1–5 or Class 6–8.</div>
+    <div class="pstep"><span>3</span><b>Score each theme</b>Selected option → points out of 10 (Workbook = 5 + 5).</div>
+    <div class="pstep"><span>4</span><b>Theme %</b>Theme score ÷ 10, shown per school.</div>
+    <div class="pstep"><span>5</span><b>Composite</b>Σ (theme score × weight) = score out of 10.</div>
+    <div class="pstep"><span>6</span><b>Block / district</b>Average of school scores, NA removed from the denominator.</div>
+  </div>
+  <div class="formula"><b>Composite score (0–10)</b> = Σ<sub>themes</sub> theme score (0–10) × theme weight &nbsp;·&nbsp; weights add up to 1.00</div>
+  <div class="bands"><div class="tlabel">Colour bands on the dashboard</div>
+    <span class="bnd b-red">Red · 0 to &lt;2.5</span><span class="bnd b-orange">Orange · 2.5 to &lt;5</span><span class="bnd b-yellow">Yellow · 5 to &lt;7.5</span><span class="bnd b-green">Green · 7.5 to 10</span></div>
+</section>
+
+<section id="kpis" class="block">
+  <div class="eyebrow">2 · KPIs and weights</div><h2>Which KPIs, which questions</h2><div class="yrule"></div>
+  <p class="lead">Six themes are shared. For Class 6–8, the 25% that TG Usage carries in Class 1–5 is split equally between Project-based Teaching and STEM Kit Usage.</p>
+  <table class="tbl"><thead><tr><th>KPI theme</th><th>Gunvatta question(s)</th><th>Class 1–5 weight</th><th>Class 6–8 weight</th><th>Max points</th></tr></thead><tbody>
+<tr><td><a href="#kpi-tg"><b>TG (Sandarshika) Usage</b></a></td><td><a class="qref" href="#q-45">Q45</a></td><td class="c">25%</td><td class="c"><span class="na">—</span></td><td class="c">10</td></tr><tr><td><a href="#kpi-pbl"><b>Project-based Teaching</b></a></td><td><a class="qref" href="#q-U6">U6</a></td><td class="c"><span class="na">—</span></td><td class="c">12.5%</td><td class="c">10</td></tr><tr><td><a href="#kpi-stem"><b>STEM Kit Usage</b></a></td><td><a class="qref" href="#q-U5">U5</a></td><td class="c"><span class="na">—</span></td><td class="c">12.5%</td><td class="c">10</td></tr><tr><td><a href="#kpi-tlm"><b>TLM Usage</b></a></td><td><a class="qref" href="#q-48">Q48</a></td><td class="c">15%</td><td class="c">15%</td><td class="c">10</td></tr><tr><td><a href="#kpi-wat"><b>Weekly Assessment Tracker</b></a></td><td><a class="qref" href="#q-58">Q58</a></td><td class="c">10%</td><td class="c">10%</td><td class="c">10</td></tr><tr><td><a href="#kpi-nt"><b>NIPUN Talika</b></a></td><td><a class="qref" href="#q-57">Q57</a></td><td class="c">15%</td><td class="c">15%</td><td class="c">10</td></tr><tr><td><a href="#kpi-cu"><b>Catch-up Teaching</b></a></td><td><a class="qref" href="#q-60">Q60</a></td><td class="c">15%</td><td class="c">15%</td><td class="c">10</td></tr><tr><td><a href="#kpi-wb"><b>Workbook Usage</b></a></td><td><a class="qref" href="#q-52">Q52</a> + <a class="qref" href="#q-53">Q53</a></td><td class="c">15%</td><td class="c">15%</td><td class="c">10</td></tr><tr><td><a href="#kpi-sp"><b>Student Participation</b></a></td><td><a class="qref" href="#q-42">Q42</a></td><td class="c">5%</td><td class="c">5%</td><td class="c">10</td></tr>
+<tr class="tot"><td>Total</td><td></td><td class="c">100%</td><td class="c">100%</td><td class="c">Composite out of 10</td></tr></tbody></table>
+</section>
+
+<section id="detail" class="block">
+  <div class="eyebrow">3 · KPI logic</div><h2>Answer-to-score logic for each KPI</h2><div class="yrule"></div>
+  <div class="kpis"><article class="kpi" id="kpi-tg"><div class="kpi-h"><div><div class="kpi-name">TG (Sandarshika) Usage</div><div class="kpi-scope">Class 1–5 only</div></div><div class="kpi-w"><span>1–5 <b>25%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-45">Q45</a><span>Which teaching method did the teacher use while teaching?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>Teacher followed the teacher guide’s lesson plan step by step</td><td class="sc s10">10</td></tr><tr><td>Teacher used the teacher guide as a reference but taught with their own method</td><td class="sc s10">10</td></tr><tr><td>Teacher taught with a self-made lesson plan / method</td><td class="sc s5">5</td></tr><tr><td>No structured teaching method was followed</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q45 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-pbl"><div class="kpi-h"><div><div class="kpi-name">Project-based Teaching</div><div class="kpi-scope">Class 6–8 only</div></div><div class="kpi-w"><span>6–8 <b>12.5%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-U6">U6</a><span>Are project-based learning activities being carried out in the school?</span></div>
+      <div class="kq-where">Asked in: Section 9 · Lane B (Composite / UPS)</div>
+      <table class="opt-tbl"><tbody><tr><td>Yes</td><td class="sc s10">10</td></tr><tr><td>No</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in U6 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-stem"><div class="kpi-h"><div><div class="kpi-name">STEM Kit Usage</div><div class="kpi-scope">Class 6–8 only</div></div><div class="kpi-w"><span>6–8 <b>12.5%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-U5">U5</a><span>Is the STEM kit being used in the school?</span></div>
+      <div class="kq-where">Asked in: Section 9 · Lane B (Composite / UPS)</div>
+      <table class="opt-tbl"><tbody><tr><td>Yes</td><td class="sc s10">10</td></tr><tr><td>No</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in U5 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-tlm"><div class="kpi-h"><div><div class="kpi-name">TLM Usage</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>15%</b></span><span>6–8 <b>15%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-48">Q48</a><span>Did the teacher use TLM / print-rich material (story charts, math kit, teacher-made material etc.) to teach concepts/processes?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>Any material selected (TLM, print-rich material, story chart, math kit, teacher-made material)</td><td class="sc s10">10</td></tr><tr><td>None of the above (no TLM / material used)</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q48 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-wat"><div class="kpi-h"><div><div class="kpi-name">Weekly Assessment Tracker</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>10%</b></span><span>6–8 <b>10%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-58">Q58</a><span>Is the teacher regularly filling the weekly assessment tracker and identifying Group A?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>Teacher fills the tracker regularly and divides students into Groups A and B</td><td class="sc s10">10</td></tr><tr><td>Teacher fills the tracker regularly, but does not divide students into Groups A/B</td><td class="sc s6">6</td></tr><tr><td>Teacher fills the tracker partially</td><td class="sc s3">3</td></tr><tr><td>Teacher does not fill the tracker</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q58 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-nt"><div class="kpi-h"><div><div class="kpi-name">NIPUN Talika</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>15%</b></span><span>6–8 <b>15%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-57">Q57</a><span>Is the teacher regularly updating the ‘NIPUN Talika’ according to students’ learning levels?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>NIPUN Talika not available in the class, or on the wall but completely empty</td><td class="sc s0">0</td></tr><tr><td>Talika is filled, but stuck on old data or records only some students</td><td class="sc s5">5</td></tr><tr><td>All students’ entries correctly recorded / updated to their current learning level</td><td class="sc s10">10</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q57 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-cu"><div class="kpi-h"><div><div class="kpi-name">Catch-up Teaching</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>15%</b></span><span>6–8 <b>15%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-60">Q60</a><span>On the last working day, did the teacher do catch-up teaching with Group A students?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>Group A not identified and no catch-up teaching done</td><td class="sc s0">0</td></tr><tr><td>Catch-up teaching done, but no evidence in lesson plan / workbook</td><td class="sc s3">3</td></tr><tr><td>Group A identified, but no catch-up teaching done</td><td class="sc s5">5</td></tr><tr><td>Group A identified, catch-up lesson plan made and teaching done</td><td class="sc s10">10</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q60 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-wb"><div class="kpi-h"><div><div class="kpi-name">Workbook Usage</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>15%</b></span><span>6–8 <b>15%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-52">Q52</a><span>What percentage of students in the class have workbooks?</span></div>
+      <div class="kq-where">Asked in: Classroom observation · scored out of 5</div>
+      <table class="opt-tbl"><tbody><tr><td>0–40% of students have workbooks</td><td class="sc s0">0</td></tr><tr><td>40–70%</td><td class="sc s6">3</td></tr><tr><td>70–100%</td><td class="sc s10">5</td></tr></tbody></table></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-53">Q53</a><span>Has the workbook been used effectively in the past week? (Check 5 students’ workbooks at random)</span></div>
+      <div class="kq-where">Asked in: Classroom observation · scored out of 5</div>
+      <table class="opt-tbl"><tbody><tr><td>Workbook available, but no work is being done</td><td class="sc s0">0</td></tr><tr><td>Work is being done, but the teacher is not checking it</td><td class="sc s2">1</td></tr><tr><td>Work is checked, but no corrective suggestions on mistakes</td><td class="sc s6">3</td></tr><tr><td>Work is checked and corrective suggestions are given on mistakes</td><td class="sc s10">5</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = Q52 points (out of 5) + Q53 points (out of 5) = out of 10. Direct sum, no averaging. Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article><article class="kpi" id="kpi-sp"><div class="kpi-h"><div><div class="kpi-name">Student Participation</div><div class="kpi-scope">Class 1–5 and Class 6–8</div></div><div class="kpi-w"><span>1–5 <b>5%</b></span><span>6–8 <b>5%</b></span></div></div>
+    <div class="kq"><div class="kq-h"><a class="qref" href="#q-42">Q42</a><span>Is the classroom environment participatory, with students showing interest in learning and feeling confident to ask questions?</span></div>
+      <div class="kq-where">Asked in: Classroom observation</div>
+      <table class="opt-tbl"><tbody><tr><td>Yes</td><td class="sc s10">10</td></tr><tr><td>No</td><td class="sc s0">0</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Theme score = points for the option selected in Q42 (out of 10). Theme % = theme score ÷ 10. Contribution to composite = theme score × weight.</div></article></div>
+</section>
+
+<section id="example" class="block">
+  <div class="eyebrow">4 · Worked example</div><h2>A Class 3 observation, scored</h2><div class="yrule"></div>
+  <table class="tbl"><thead><tr><th>KPI theme</th><th>Answer selected → points</th><th>Theme score</th><th>Weight</th><th>Contribution</th></tr></thead><tbody>
+  <tr><td><b>TG (Sandarshika) Usage</b></td><td class="small">Q45: Teacher used the teacher guide as a reference but taught with their own method → 10/10</td><td class="c">10 / 10 (100%)</td><td class="c">25%</td><td class="c">2.50</td></tr><tr><td><b>TLM Usage</b></td><td class="small">Q48: Any material selected (TLM, print-rich material, story chart, math kit, teacher-made material) → 10/10</td><td class="c">10 / 10 (100%)</td><td class="c">15%</td><td class="c">1.50</td></tr><tr><td><b>Weekly Assessment Tracker</b></td><td class="small">Q58: Teacher fills the tracker regularly, but does not divide students into Groups A/B → 6/10</td><td class="c">6 / 10 (60%)</td><td class="c">10%</td><td class="c">0.60</td></tr><tr><td><b>NIPUN Talika</b></td><td class="small">Q57: Talika is filled, but stuck on old data or records only some students → 5/10</td><td class="c">5 / 10 (50%)</td><td class="c">15%</td><td class="c">0.75</td></tr><tr><td><b>Catch-up Teaching</b></td><td class="small">Q60: Group A identified, but no catch-up teaching done → 5/10</td><td class="c">5 / 10 (50%)</td><td class="c">15%</td><td class="c">0.75</td></tr><tr><td><b>Workbook Usage</b></td><td class="small">Q52: 70–100% → 5/5<br>Q53: Work is checked, but no corrective suggestions on mistakes → 3/5</td><td class="c">8 / 10 (80%)</td><td class="c">15%</td><td class="c">1.20</td></tr><tr><td><b>Student Participation</b></td><td class="small">Q42: Yes → 10/10</td><td class="c">10 / 10 (100%)</td><td class="c">5%</td><td class="c">0.50</td></tr>
+  <tr class="tot"><td>Composite score</td><td></td><td></td><td class="c">100%</td><td class="c"><span class="bnd b-green">7.80 · Green</span></td></tr></tbody></table>
+</section>
+
+<section id="flow" class="block">
+  <div class="eyebrow">5 · Question flow</div><h2>Checklist process chart</h2><div class="yrule"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:#e7f1fb;border:2px solid var(--blue)"></i>Feeds an NBMC KPI (click the badge for its logic)</span>
+    <span><i class="sw" style="background:var(--yellow10);border:1px solid var(--yellow)"></i>Conditional question</span>
+    <span><i class="sw" style="background:var(--orangebg)"></i>Not shown for Upper Primary</span>
+    <span><i class="sw" style="background:var(--yellow)"></i>Decides later flow</span>
+  </div>
+  <div class="filters" id="filters" hidden>
+    <span class="tlabel">Show for school type</span>
+    <div class="seg"><button data-v="all" class="on">All</button><button data-v="Primary">Primary</button><button data-v="UPS">Upper Primary</button><button data-v="Composite">Composite</button></div>
+    <label class="chk"><input type="checkbox" id="pm"> PM SHRI</label>
+    <label class="chk"><input type="checkbox" id="kOnly"> NBMC questions only</label>
+  </div>
+  <div id="chart"><div class="node"><div class="pill-node">Start visit · open checklist</div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">01</div><div><div class="stitle">General information</div><div class="smeta">5 questions · 5 always asked, 0 conditional</div></div></div><div class="sbody"><div class="q" id="q-1" data-ups="0" data-g=""><span class="qn">Q1</span><div><div class="qt">District name</div></div><span class="type ">Auto-filled</span></div><div class="q" id="q-2" data-ups="0" data-g=""><span class="qn">Q2</span><div><div class="qt">Block name</div></div><span class="type ">Auto-filled</span></div><div class="q" id="q-3" data-ups="0" data-g=""><span class="qn">Q3</span><div><div class="qt">Nyaya Panchayat name</div></div><span class="type ">Auto-filled</span></div><div class="q" id="q-4" data-ups="0" data-g=""><span class="qn">Q4</span><div><div class="qt">School type</div><div class="opts">Primary · Upper Primary · Composite</div><div class="flags"><span class="flag f-key">Decides later flow</span></div></div><span class="type ">Dropdown</span></div><div class="q" id="q-5" data-ups="0" data-g=""><span class="qn">Q5</span><div><div class="qt">School name (UDISE code)</div><div class="opts">List of schools in the Nyaya Panchayat</div><div class="flags"><span class="flag f-key">Decides later flow</span></div></div><span class="type ">Dropdown</span></div></div></div><div class="arrow"></div><div class="gate"><h3><span class="dia"></span>Decision: Q4 school type + Q5 school</h3><div class="paths">
+    <div class="path"><b>Primary</b>All core questions. Section 9 only if PM SHRI.</div>
+    <div class="path"><b>Upper Primary</b>Skips Q20–21 (NIPUN posters) and Q43–44 (teacher guide). Gets section 9 Lane B.</div>
+    <div class="path"><b>Composite</b>All core questions. Gets section 9 Lane B.</div></div>
+    <div class="path" style="margin-top:10px"><b>PM SHRI flag (from Q5)</b>Any school type marked PM SHRI also gets section 9 Lane A.</div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">02</div><div><div class="stitle">Previous mentor visit feedback</div><div class="smeta">Read-only screen · no questions</div></div></div><div class="sbody"><div class="ro"><b>Shows from the last visit to this school:</b> the points the previous mentor recorded in Q71 (joint meeting with HM and teachers), with that mentor’s name and visit date.</div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">03</div><div><div class="stitle">Classroom and teacher information</div><div class="smeta">6 questions · 6 always asked, 0 conditional</div></div></div><div class="sbody"><div class="q" id="q-6" data-ups="0" data-g=""><span class="qn">Q6</span><div><div class="qt">Class observed</div><div class="opts">Class 1–8</div><div class="flags"><span class="flag f-key">Decides NBMC framework (Class 1–5 or 6–8)</span></div></div><span class="type ">Dropdown</span></div><div class="q" id="q-7" data-ups="0" data-g=""><span class="qn">Q7</span><div><div class="qt">Subject observed</div><div class="opts">Hindi · Math · English · Science · Our Environment · Social Science · Other (give details)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type ">Single choice</span></div><div class="q" id="q-8" data-ups="0" data-g=""><span class="qn">Q8</span><div><div class="qt">Teacher’s name</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-9" data-ups="0" data-g=""><span class="qn">Q9</span><div><div class="qt">Teacher’s Manav Sampada code</div></div><span class="type ">Numeric</span></div><div class="q" id="q-10" data-ups="0" data-g=""><span class="qn">Q10</span><div><div class="qt">Teacher’s designation</div><div class="opts">Head Teacher · Assistant Teacher · Shiksha Mitra · Instructor</div></div><span class="type ">Dropdown</span></div><div class="q" id="q-11" data-ups="0" data-g=""><span class="qn">Q11</span><div><div class="qt">Teacher’s mobile number</div></div><span class="type ">Numeric</span></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">04</div><div><div class="stitle">Student and teacher information</div><div class="smeta">5 questions · 5 always asked, 0 conditional</div></div></div><div class="sbody"><div class="q" id="q-12" data-ups="0" data-g=""><span class="qn">Q12</span><div><div class="qt">Total number of students enrolled in the school</div></div><span class="type ">Numeric</span></div><div class="q" id="q-13" data-ups="0" data-g=""><span class="qn">Q13</span><div><div class="qt">Total number of students present in the school</div></div><span class="type ">Numeric</span></div><div class="q" id="q-14" data-ups="0" data-g=""><span class="qn">Q14</span><div><div class="qt">Total number of working teachers in the school</div></div><span class="type ">Numeric</span></div><div class="q" id="q-15" data-ups="0" data-g=""><span class="qn">Q15</span><div><div class="qt">Total number of teachers present in the school</div></div><span class="type ">Numeric</span></div><div class="q" id="q-16" data-ups="0" data-g=""><span class="qn">Q16</span><div><div class="qt">Does the school, student and teacher data recorded in UDISE+ fully match the actual status of the school? If not, which details differ and what action is being taken to correct them?</div><div class="flags"><span class="flag f-det">If “No” → details box</span></div></div><span class="type t-yn">Yes / No</span></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">05</div><div><div class="stitle">School status</div><div class="smeta">17 questions · 10 always asked, 7 conditional</div></div></div><div class="sbody"><div class="q" id="q-17" data-ups="0" data-g=""><span class="qn">Q17</span><div><div class="qt">What work has been done at the school/classroom level on the suggestions given during the previous visit?</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-18" data-ups="0" data-g=""><span class="qn">Q18</span><div><div class="qt">Have all students received their textbooks and workbooks?</div><div class="flags"><span class="flag f-det">If “No” → details box</span></div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-19" data-ups="0" data-g=""><span class="qn">Q19</span><div><div class="qt">Have 100% of students received the DBT amount and purchased their uniforms?</div><div class="flags"><span class="flag f-det">If “No” → details box</span></div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-20" data-ups="1" data-g=""><span class="qn">Q20</span><div><div class="qt">Are A2-size colour-printed NIPUN Lakshya posters displayed in Classes 1 to 5?</div><div class="flags"><span class="flag f-ups">Not shown for Upper Primary</span></div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q20 = Yes</span><div class="q" id="q-21" data-ups="1" data-g=""><span class="qn">Q21</span><div><div class="qt">If yes, upload a photo</div><div class="flags"><span class="flag f-ups">Not shown for Upper Primary</span></div></div><span class="type t-photo">Photo</span></div></div><div class="q" id="q-22" data-ups="0" data-g=""><span class="qn">Q22</span><div><div class="qt">Are teachers filling the Holistic Progress Card (HPC) for all students and sharing it with parents?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-23" data-ups="0" data-g=""><span class="qn">Q23</span><div><div class="qt">Is the academic calendar being followed in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q23 = Yes</span><div class="q" id="q-24" data-ups="0" data-g=""><span class="qn">Q24</span><div><div class="qt">What % of the syllabus has been completed?</div></div><span class="type ">Descriptive</span></div></div><div class="q" id="q-25" data-ups="0" data-g=""><span class="qn">Q25</span><div><div class="qt">Is the timetable displayed in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q25 = Yes</span><div class="q" id="q-26" data-ups="0" data-g=""><span class="qn">Q26</span><div><div class="qt">Upload a photo of the timetable</div></div><span class="type t-photo">Photo</span></div><div class="q" id="q-27" data-ups="0" data-g=""><span class="qn">Q27</span><div><div class="qt">Is teaching being done according to the class division?</div></div><span class="type t-yn">Yes / No</span></div></div><div class="q" id="q-28" data-ups="0" data-g=""><span class="qn">Q28</span><div><div class="qt">Are classes being run with more than one class in a single room in this school?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-29" data-ups="0" data-g=""><span class="qn">Q29</span><div><div class="qt">How many out-of-school children are there in your school? (Enter 0 if none)</div></div><span class="type ">Numeric</span></div><div class="branch"><span class="cond">If Q29 = not 0</span><div class="q" id="q-30" data-ups="0" data-g=""><span class="qn">Q30</span><div><div class="qt">Are these children being given special training based on the condensed curriculum?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-31" data-ups="0" data-g=""><span class="qn">Q31</span><div><div class="qt">Is the nodal teacher uploading attendance and assessment details of out-of-school children on the Sharda app?</div></div><span class="type t-yn">Yes / No</span></div></div><div class="q" id="q-32" data-ups="0" data-g=""><span class="qn">Q32</span><div><div class="qt">Are children with disabilities enrolled in your school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q32 = Yes</span><div class="q" id="q-33" data-ups="0" data-g=""><span class="qn">Q33</span><div><div class="qt">Which facilities are available in the school for children with disabilities?</div><div class="opts">Ramp · Accessible toilet · Assistive devices · Assistive learning material · Other (please specify)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type t-multi">Multi-select</span></div></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">06</div><div><div class="stitle">School learning resources and initiatives</div><div class="smeta">7 questions · 3 always asked, 4 conditional</div></div></div><div class="sbody"><div class="q" id="q-34" data-ups="0" data-g=""><span class="qn">Q34</span><div><div class="qt">Which of the following initiatives/resources are currently being used effectively in the school?</div><div class="opts">NIPUN Lakshya posters · 10-Point Toolkit · Catch-Up teaching poster / framework · Reading activities · HPC · None of the above</div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-35" data-ups="0" data-g=""><span class="qn">Q35</span><div><div class="qt">Is the teacher using a tablet for teaching?</div><div class="opts">Yes · No · Tablet not available</div></div><span class="type ">Single choice</span></div><div class="branch"><span class="cond">If Q35 = No</span><div class="q" id="q-36" data-ups="0" data-g=""><span class="qn">Q36</span><div><div class="qt">If not, why is it not being used?</div><div class="opts">Technical problem · Internet related · Teacher absent · Other (give details)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type ">Single choice</span></div></div><div class="q" id="q-37" data-ups="0" data-g=""><span class="qn">Q37</span><div><div class="qt">Are sports materials available in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q37 = Yes</span><div class="q" id="q-38" data-ups="0" data-g=""><span class="qn">Q38</span><div><div class="qt">Do children regularly take part in sports activities?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q38 = Yes</span><div class="q" id="q-39" data-ups="0" data-g=""><span class="qn">Q39</span><div><div class="qt">Upload a photo of children playing</div><div class="flags"><span class="flag f-opt">Optional</span></div></div><span class="type t-photo">Photo</span></div></div></div><div class="branch"><span class="cond">If Q37 = No</span><div class="q" id="q-40" data-ups="0" data-g=""><span class="qn">Q40</span><div><div class="qt">Please select the reason</div><div class="opts">Sports grant has not been received · Grant received, but materials have not been purchased</div></div><span class="type ">Single choice</span></div></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">07</div><div><div class="stitle">Classroom observation</div><div class="smeta">24 questions · 20 always asked, 4 conditional · <b class="kcount">8 feed NBMC</b></div></div></div><div class="sbody"><div class="q" id="q-41" data-ups="0" data-g=""><span class="qn">Q41</span><div><div class="qt">Before teaching, did the teacher try to make the classroom environment comfortable, safe and positive?</div></div><span class="type t-yn">Yes / No</span></div><div class="q is-kpi" id="q-42" data-ups="0" data-g=""><span class="qn">Q42</span><div><div class="qt">Is the classroom environment participatory, with students showing interest in learning and feeling confident to ask questions?</div><div class="flags"><a class="kpi-badge" href="#kpi-sp">NBMC · Student Participation · 5% · Class 1–8</a></div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-43" data-ups="1" data-g=""><span class="qn">Q43</span><div><div class="qt">Was the teacher guide (Sandarshika) available during the classroom observation?</div><div class="flags"><span class="flag f-ups">Not shown for Upper Primary</span></div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q43 = Yes</span><div class="q" id="q-44" data-ups="1" data-g=""><span class="qn">Q44</span><div><div class="qt">Did the teacher refer to the teacher guide while teaching?</div><div class="flags"><span class="flag f-ups">Not shown for Upper Primary</span></div></div><span class="type t-yn">Yes / No</span></div></div><div class="q is-kpi" id="q-45" data-ups="0" data-g=""><span class="qn">Q45</span><div><div class="qt">Which teaching method did the teacher use while teaching?</div><div class="opts">Followed teacher guide lesson plan step by step · Used teacher guide as reference, own method · Self-made lesson plan / method · No structured method</div><div class="flags"><a class="kpi-badge" href="#kpi-tg">NBMC · TG (Sandarshika) Usage · 25% · Class 1–5</a></div></div><span class="type ">Single choice</span></div><div class="q" id="q-46" data-ups="0" data-g=""><span class="qn">Q46</span><div><div class="qt">Are the NIPUN Talika, workbooks and teaching material available in the classroom?</div><div class="opts">NIPUN Talika · Workbook · Teaching material (teacher guide, TLM, workbook, big book etc.) · None of the above</div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-47" data-ups="0" data-g=""><span class="qn">Q47</span><div><div class="qt">Please state which teaching materials are not available.</div></div><span class="type ">Descriptive</span></div><div class="q is-kpi" id="q-48" data-ups="0" data-g=""><span class="qn">Q48</span><div><div class="qt">Did the teacher use TLM / print-rich material (story charts, math kit, teacher-made material etc.) to teach concepts/processes?</div><div class="opts">TLM · Print-rich material · Story chart · Math kit · Teacher-made material · None of the above</div><div class="flags"><a class="kpi-badge" href="#kpi-tlm">NBMC · TLM Usage · 15% · Class 1–8</a></div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-49" data-ups="0" data-g=""><span class="qn">Q49</span><div><div class="qt">Upload a photo of the TLM made by the teacher</div></div><span class="type t-photo">Photo</span></div><div class="q" id="q-50" data-ups="0" data-g=""><span class="qn">Q50</span><div><div class="qt">Which of the following is the teacher doing for an effective teaching-learning process?</div><div class="opts">Regular practice work · Practice work reviewed/checked · Meaningful and timely feedback · None of the above</div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-51" data-ups="0" data-g=""><span class="qn">Q51</span><div><div class="qt">Are pair or small-group learning activities taking place in the classroom?</div></div><span class="type t-yn">Yes / No</span></div><div class="q is-kpi" id="q-52" data-ups="0" data-g=""><span class="qn">Q52</span><div><div class="qt">What percentage of students in the class have workbooks?</div><div class="opts">0–40% · 40–70% · 70–100%</div><div class="flags"><a class="kpi-badge" href="#kpi-wb">NBMC · Workbook Usage · 15% · Class 1–8</a></div></div><span class="type ">Single choice</span></div><div class="q is-kpi" id="q-53" data-ups="0" data-g=""><span class="qn">Q53</span><div><div class="qt">Has the workbook been used effectively in the past week? (Check 5 students’ workbooks at random)</div><div class="opts">Available, no work done · Work done, not checked · Checked, no corrective suggestions · Checked with corrective suggestions</div><div class="flags"><a class="kpi-badge" href="#kpi-wb">NBMC · Workbook Usage · 15% · Class 1–8</a></div></div><span class="type ">Single choice</span></div><div class="q" id="q-54" data-ups="0" data-g=""><span class="qn">Q54</span><div><div class="qt">Upload a photo of one student’s workbook showing last week’s work</div></div><span class="type t-photo">Photo</span></div><div class="q" id="q-55" data-ups="0" data-g=""><span class="qn">Q55</span><div><div class="qt">Is the teacher getting writing work done in the workbook every day?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q55 = Yes</span><div class="q" id="q-56" data-ups="0" data-g=""><span class="qn">Q56</span><div><div class="qt">Upload 2 photos of the writing work</div></div><span class="type t-photo">Photo ×2</span></div></div><div class="q is-kpi" id="q-57" data-ups="0" data-g=""><span class="qn">Q57</span><div><div class="qt">Is the teacher regularly updating the ‘NIPUN Talika’ according to students’ learning levels?</div><div class="opts">Not available / empty · Filled, but old or partial · All students correctly updated</div><div class="flags"><a class="kpi-badge" href="#kpi-nt">NBMC · NIPUN Talika · 15% · Class 1–8</a></div></div><span class="type ">Single choice</span></div><div class="q is-kpi" id="q-58" data-ups="0" data-g=""><span class="qn">Q58</span><div><div class="qt">Is the teacher regularly filling the weekly assessment tracker and identifying Group A?</div><div class="opts">Fills regularly and groups A/B · Fills regularly, no A/B grouping · Fills partially · Does not fill</div><div class="flags"><a class="kpi-badge" href="#kpi-wat">NBMC · Weekly Assessment Tracker · 10% · Class 1–8</a></div></div><span class="type ">Single choice</span></div><div class="q" id="q-59" data-ups="0" data-g=""><span class="qn">Q59</span><div><div class="qt">Is the teacher making their own lesson plans for consolidation / catch-up teaching?</div></div><span class="type t-yn">Yes / No</span></div><div class="q is-kpi" id="q-60" data-ups="0" data-g=""><span class="qn">Q60</span><div><div class="qt">On the last working day, did the teacher do catch-up teaching with Group A students?</div><div class="opts">Group A not identified, no catch-up · Catch-up done, no evidence · Group A identified, no catch-up · Identified, lesson plan made and taught</div><div class="flags"><a class="kpi-badge" href="#kpi-cu">NBMC · Catch-up Teaching · 15% · Class 1–8</a></div></div><span class="type ">Single choice</span></div><div class="q" id="q-61" data-ups="0" data-g=""><span class="qn">Q61</span><div><div class="qt">Describe the form of catch-up done</div><div class="opts">Individual practice · Pair / group work · Additional reading practice · Other (give details)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type ">Single choice</span></div><div class="q" id="q-62" data-ups="0" data-g=""><span class="qn">Q62</span><div><div class="qt">Is an active library running in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q62 = Yes</span><div class="q" id="q-63" data-ups="0" data-g=""><span class="qn">Q63</span><div><div class="qt">What is the total number of books available in the school library?</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-64" data-ups="0" data-g=""><span class="qn">Q64</span><div><div class="qt">Are students given library books to take home?</div></div><span class="type t-yn">Yes / No</span></div></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">08</div><div><div class="stitle">General feedback</div><div class="smeta">12 questions · 10 always asked, 2 conditional</div></div></div><div class="sbody"><div class="q" id="q-65" data-ups="0" data-g=""><span class="qn">Q65</span><div><div class="qt">Did you share key positive and motivating points about their teaching process / skills and classroom management with the teacher?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-66" data-ups="0" data-g=""><span class="qn">Q66</span><div><div class="qt">Briefly describe at least 2 key positive and motivating points you shared with the teacher.</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-67" data-ups="0" data-g=""><span class="qn">Q67</span><div><div class="qt">Please write two key areas for improvement that you shared with the teacher.</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-68" data-ups="0" data-g=""><span class="qn">Q68</span><div><div class="qt">Has the teacher adopted any outstanding teaching practice that could be replicated at state or district level?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If Q68 = Yes</span><div class="q" id="q-69" data-ups="0" data-g=""><span class="qn">Q69</span><div><div class="qt">Please briefly describe this outstanding teaching practice / innovation.</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-70" data-ups="0" data-g=""><span class="qn">Q70</span><div><div class="qt">Upload a photo related to this practice / innovation</div><div class="flags"><span class="flag f-opt">Optional</span></div></div><span class="type t-photo">Photo</span></div></div><div class="q" id="q-71" data-ups="0" data-g=""><span class="qn">Q71</span><div><div class="qt">Note the points discussed today in the joint meeting with the HM and all teachers. (Visible to the mentor on the next visit.)</div><div class="flags"><span class="flag f-key">Shown to next mentor</span></div></div><span class="type ">Descriptive</span></div><div class="q" id="q-72" data-ups="0" data-g=""><span class="qn">Q72</span><div><div class="qt">What is the biggest barrier to this school becoming a NIPUN school / grade-competent school?</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-73" data-ups="0" data-g=""><span class="qn">Q73</span><div><div class="qt">Briefly describe the action taken to address this barrier.</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-74" data-ups="0" data-g=""><span class="qn">Q74</span><div><div class="qt">Which of these resources is the teacher using to make teaching-learning effective?</div><div class="opts">PM e-Vidya DTH TV channel · PM e-Vidya YouTube channels · None of the above</div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-75" data-ups="0" data-g=""><span class="qn">Q75</span><div><div class="qt">How many teachers in the school have uploaded their innovations and best practices on the UDGAM portal?</div></div><span class="type ">Numeric</span></div><div class="q" id="q-76" data-ups="0" data-g=""><span class="qn">Q76</span><div><div class="qt">If any gap is seen in the 19 basic infrastructure parameters of Kayakalp, identify it.</div></div><span class="type ">Descriptive</span></div></div></div><div class="arrow"></div><div class="gate"><h3><span class="dia"></span>Gate: does section 9 apply?</h3><div class="paths">
+    <div class="path"><b>PM SHRI school (Q5)</b>Lane A: 6 questions</div>
+    <div class="path"><b>Composite or Upper Primary (Q4)</b>Lane B: 7 questions (U5 and U6 feed NBMC Class 6–8)</div>
+    <div class="path"><b>Primary, not PM SHRI</b>Section 9 skipped → go to review</div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">09</div><div><div class="stitle">School-related other observations</div><div class="smeta">13 questions across two lanes · a school can get one, both or neither</div></div></div><div class="sbody cols">
+      <div class="lane" data-lane="pm"><div class="lane-h">Lane A · PM SHRI schools</div><div class="q" id="q-P1" data-ups="0" data-g="pm"><span class="qn">P1</span><div><div class="qt">Is the book “Shishtachar” available in the school library?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-P2" data-ups="0" data-g="pm"><span class="qn">P2</span><div><div class="qt">Are moral values discussed during the morning assembly?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-P3" data-ups="0" data-g="pm"><span class="qn">P3</span><div><div class="qt">Are students practising newspaper reading in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-P4" data-ups="0" data-g="pm"><span class="qn">P4</span><div><div class="qt">Has a digital library been set up in the school?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If P4 = Yes</span><div class="q" id="q-P5" data-ups="0" data-g="pm"><span class="qn">P5</span><div><div class="qt">Is the digital library running smoothly?</div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If P5 = No</span><div class="q" id="q-P6" data-ups="0" data-g="pm"><span class="qn">P6</span><div><div class="qt">If not, why is it not being used?</div><div class="opts">Technical problem · Power supply related · Internet related · Teacher absent · Other (give details)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type ">Single choice</span></div></div></div></div>
+      <div class="lane" data-lane="up"><div class="lane-h">Lane B · Composite and UPS schools</div><div class="q" id="q-U1" data-ups="0" data-g="up"><span class="qn">U1</span><div><div class="qt">Is the ICT / smart class lab running smoothly?</div><div class="opts">Yes · No · ICT / smart class lab is not set up</div></div><span class="type ">Single choice</span></div><div class="branch"><span class="cond">If U1 = Yes</span><div class="q" id="q-U2" data-ups="0" data-g="up"><span class="qn">U2</span><div><div class="qt">For how long is the ICT / smart class lab run each day?</div><div class="opts">Less than 30 min · 30–60 min · More than 60 min</div></div><span class="type ">Single choice</span></div></div><div class="branch"><span class="cond">If U1 = No</span><div class="q" id="q-U3" data-ups="0" data-g="up"><span class="qn">U3</span><div><div class="qt">If not, why is it not being used?</div><div class="opts">Technical problem · Power supply related · Internet related · Teacher absent · Other (give details)</div><div class="flags"><span class="flag f-det">“Other” → text box</span></div></div><span class="type ">Single choice</span></div></div><div class="q" id="q-U4" data-ups="0" data-g="up"><span class="qn">U4</span><div><div class="qt">Has the school completed the target of 10 bagless days?</div></div><span class="type t-yn">Yes / No</span></div><div class="q is-kpi" id="q-U5" data-ups="0" data-g="up"><span class="qn">U5</span><div><div class="qt">Is the STEM kit being used in the school?</div><div class="flags"><a class="kpi-badge" href="#kpi-stem">NBMC · STEM Kit Usage · 12.5% · Class 6–8</a></div></div><span class="type t-yn">Yes / No</span></div><div class="q is-kpi" id="q-U6" data-ups="0" data-g="up"><span class="qn">U6</span><div><div class="qt">Are project-based learning activities being carried out in the school?</div><div class="flags"><a class="kpi-badge" href="#kpi-pbl">NBMC · Project-based Teaching · 12.5% · Class 6–8</a></div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-U7" data-ups="0" data-g="up"><span class="qn">U7</span><div><div class="qt">Has an MHM club been formed in the school and have sanitary pads been distributed to all eligible girls?</div><div class="opts">Club not formed · Formed, not active · Active, pads not available · Girls not aware of club · Girls aware and pads provided</div></div><span class="type ">Single choice</span></div></div></div></div><div class="arrow"></div><div class="node"><div class="pill-node end">Review and submit → data flows to NBMC dashboard</div></div></div>
+</section>
+
+<section id="open" class="block">
+  <div class="eyebrow">6 · Open points</div><h2>To confirm before the dashboard logic is built</h2><div class="yrule"></div>
+  <div class="issues"><div class="issue"><span>1</span><div><b>TG Usage option 3 score</b><p>The scoring table gives “self-made lesson plan / method” <b>5</b> points, but the footnote says <b>7</b>. This page uses the table (5). Confirm which is final.</p></div></div><div class="issue"><span>2</span><div><b>Workbook availability (Q52) scale</b><p>The table scores 0–40% / 40–70% / 70–100% as <b>0 / 3 / 5</b> (out of 5). A footnote says <b>0 / 5 / 10</b> and has a typo (“70–110%”). This page uses the table, since Q52 + Q53 must add to 10.</p></div></div><div class="issue"><span>3</span><div><b>Old question numbers in footnotes</b><p>Footnotes refer to Q18, Q21, Q40 and Q41. In the 21 Sept checklist these are <b>Q45, Q48, Q52 and Q53</b>. The column header also cites the 31 Aug checklist.</p></div></div><div class="issue"><span>4</span><div><b>Which framework applies</b><p>The workbook does not say what triggers Class 1–5 vs 6–8. This page assumes <b>Q6 (class observed)</b>: Class 1–5 → primary framework, Class 6–8 → upper primary framework. A Composite school can therefore be scored on either, visit by visit.</p></div></div><div class="issue"><span>5</span><div><b>Q45 for upper primary</b><p>Q45 (teaching method) is still asked when Class 6–8 is observed, but is not scored there. Confirm that is intended.</p></div></div><div class="issue"><span>6</span><div><b>U5 / U6 are school-level</b><p>STEM kit and project-based learning are school-wide questions in Section 9, not classroom observations. In a Composite school they are asked even when a Class 1–5 lesson is observed; they only count when the observed class is 6–8.</p></div></div><div class="issue"><span>7</span><div><b>Missing answers at school level</b><p>NA handling is defined only for block level (NA removed from the denominator). Confirm whether a school composite is re-weighted across the themes that have data, or shown as incomplete.</p></div></div><div class="issue"><span>8</span><div><b>Repeat visits in a month</b><p>Not specified whether the dashboard uses the latest visit per school or averages all visits in the period.</p></div></div></div>
+</section>
+
+</div></main>
+<footer>Central Square Foundation · UP SPMU · Source: Revamped Gunvatta Checklist (21 Sept 2026) and Gunvatta_NBMC_Mapping_16th_Oct.xlsx</footer>
+
+</div>
+<div class="app" id="app-b" hidden>
+<header><div class="wrap">
+  <div class="kicker">Balvatika Supportive Supervision checklist (revised, English) · NBMC dashboard logic</div>
+  <h1>Balvatika checklist and dashboard logic</h1>
+  <div class="sub">How a mentor’s Balvatika visit becomes two dashboards: the Fully Functional Balvatika (FFB) dashboard, which scores 10 KPIs as Yes or No, and the operational dashboard, which tracks visits, coverage, functioning and enrolment.</div>
+  <div class="stats">
+    <div class="stat"><b>34</b><span>checklist questions</span></div>
+    <div class="stat"><b>10</b><span>FFB KPIs · Yes / No</span></div>
+    <div class="stat"><b>9</b><span>questions feed FFB</span></div>
+    <div class="stat"><b>11</b><span>operational KPIs</span></div>
+    <div class="stat"><b>3</b><span>timestamps needed from app</span></div>
+  </div>
+</div></header>
+<nav class="toc"><div class="wrap">
+  <a href="#b-model">1 · Data model</a><a href="#b-flow">2 · Questionnaire flow</a><a href="#ffb">3 · FFB KPIs</a><a href="#ffbdetail">4 · FFB logic</a><a href="#b-example">5 · Worked example</a><a href="#ops">6 · Operational KPIs</a><a href="#rules">7 · Counting rules</a><a href="#b-open">8 · Open points</a>
+</div></nav>
+<main><div class="wrap">
+
+<section id="b-model" class="block">
+  <div class="eyebrow">1 · Data model</div><h2>From one visit to two dashboards</h2><div class="yrule"></div>
+  <div class="pipeline p7">
+    <div class="pstep"><span>1</span><b>Mentor visit</b>Fills the Balvatika SSD checklist for one school.</div>
+    <div class="pstep"><span>2</span><b>Validate</b>UDISE match, branching, present ≤ enrolled.</div>
+    <div class="pstep"><span>3</span><b>Latest visit</b>One record per school per month.</div>
+    <div class="pstep"><span>4</span><b>Filters</b>District, block, area, period, ECCE personnel.</div>
+    <div class="pstep"><span>5</span><b>Score K1–K10</b>Option map → Yes / No per running centre.</div>
+    <div class="pstep"><span>6</span><b>FFB verdict</b>All 10 KPIs Yes = Fully Functional.</div>
+    <div class="pstep"><span>7</span><b>Roll up</b>Block, district, state: count ÷ count.</div>
+  </div>
+  <div class="formula"><b>Fully Functional Balvatika</b> = K1 ∧ K2 ∧ … ∧ K10 (all Yes in the same visit) &nbsp;·&nbsp; <b>% FFB</b> = FFB centres ÷ centres running at visit</div>
+  <div class="formula" style="background:var(--teal)"><b style="color:#fff">Operational dashboard</b> = visit counts and timings over every visit · all other KPIs over each school’s latest visit</div>
+</section>
+
+<section id="b-flow" class="block">
+  <div class="eyebrow">2 · Questionnaire flow</div><h2>Balvatika checklist process chart</h2><div class="yrule"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:#e7f1fb;border:2px solid var(--blue)"></i>Feeds an FFB KPI (click the badge for its logic)</span>
+    <span><i class="sw" style="background:#e3f6ee;border:2px solid var(--teal)"></i>Feeds an operational KPI only</span>
+    <span><i class="sw" style="background:var(--yellow10);border:1px solid var(--yellow)"></i>Conditional question</span>
+    <span><i class="sw" style="background:var(--yellow)"></i>Decides later flow</span>
+  </div>
+  <div class="filters" id="b-filters" hidden>
+    <span class="tlabel">Show path for</span>
+    <div class="seg"><button data-v="all" class="on">All</button><button data-v="edu">Running · Educator</button><button data-v="oth">Running · others</button><button data-v="notrun">Not running</button></div>
+    <label class="chk"><input type="checkbox" id="fOnly"> FFB questions only</label>
+    <label class="chk"><input type="checkbox" id="oOnly"> Operational questions only</label>
+  </div>
+  <div id="b-chart"><div class="node"><div class="pill-node">Start visit · open checklist</div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">00</div><div><div class="stitle">Visit details</div><div class="smeta">Captured by the app · 3 questions · 3 always asked, 0 conditional · <b style="color:var(--teal)">3 feed operational</b></div></div></div><div class="sbody"><div class="q is-op" id="q-V1" data-s="always" data-f="0" data-o="1"><span class="qn">V1</span><div><div class="qt">District, block, school name (UDISE code)</div><div class="opts">From the mentor’s school list</div><div class="flags"><a class="op-badge" href="#op-visits">Operational · # Schools / # Visits / # Unique schools</a></div></div><span class="type ">Auto-filled</span></div><div class="q is-op" id="q-V2" data-s="always" data-f="0" data-o="1"><span class="qn">V2</span><div><div class="qt">Mentor (ARP) and visit date</div><div class="flags"><a class="op-badge" href="#op-visits">Operational · # Visits</a></div></div><span class="type ">Auto-filled</span></div><div class="q is-op" id="q-V3" data-s="always" data-f="0" data-o="1"><span class="qn">V3</span><div><div class="qt">Form start time and submit time</div><div class="flags"><a class="op-badge" href="#op-time">Operational · Avg time per visit</a><span class="flag f-sys">Needed from the app</span></div></div><span class="type t-photo">System timestamp</span></div></div></div><div class="arrow"></div><div class="gate"><h3><span class="dia"></span>Gate 1 · Q1.3 Is the centre running?</h3><div class="paths">
+<div class="path"><b>Not running (1.3 = No)</b>Ask 1.4 (reason), then the checklist closes. Counted in # visits and # unique schools, not in running-centre KPIs.</div>
+<div class="path"><b>Running · Educator (1.5 = Educator)</b>Gets 1.11 and 1.12, and the Educator-only questions in Section 2 (2.1, 2.2, 2.4).</div>
+<div class="path"><b>Running · others (1.5 ≠ Educator)</b>Gets 1.13 instead of 1.11–1.12. Skips 2.1, 2.2 and 2.4.</div></div>
+<div class="path" style="margin-top:10px"><b>Note</b>Gate 1 sits inside Section 1: questions 1.1–1.3 are asked of every school before it applies.</div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">01</div><div><div class="stitle">Section 1 · Compliance</div><div class="smeta">15 minutes · 19 questions · 14 always asked, 5 conditional · <b class="kcount">9 feed FFB</b> · <b style="color:var(--teal)">7 feed operational</b></div></div></div><div class="sbody"><div class="q" id="q-1-1" data-s="always" data-f="0" data-o="0"><span class="qn">1.1</span><div><div class="qt">Is there a co-located Anganwadi / Balvatika in this school?</div><div class="opts">Yes · No</div><div class="flags"><span class="flag f-det">Yes → 1.2 · No → 1.3</span></div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If 1.1 = Yes</span><div class="q" id="q-1-2" data-s="always" data-f="0" data-o="0"><span class="qn">1.2</span><div><div class="qt">Total number of Anganwadi centres</div></div><span class="type ">Numeric</span></div></div><div class="q is-op" id="q-1-3" data-s="always" data-f="0" data-o="1"><span class="qn">1.3</span><div><div class="qt">Is the Balvatika / centre running at the time of observation?</div><div class="opts">Yes · No</div><div class="flags"><a class="op-badge" href="#op-running">Operational · # Running schools</a><span class="flag f-key">Decides the rest of the flow</span></div></div><span class="type t-yn">Yes / No</span></div><div class="branch"><span class="cond">If 1.3 = No</span><div class="q" id="q-1-4" data-s="notrun" data-f="0" data-o="0"><span class="qn">1.4</span><div><div class="qt">Reason the centre is not running</div><div class="opts">Worker/Educator is on leave · Busy with other departmental work · Other</div><div class="flags"><span class="flag f-key">Checklist closes after this</span></div></div><span class="type ">Single choice</span></div></div><div class="q is-kpi" id="q-1-5" data-s="run" data-f="1" data-o="1"><span class="qn">1.5</span><div><div class="qt">Who is mainly running the Balvatika?</div><div class="opts">Educator · Anganwadi Worker · Shiksha Mitra · Assistant Teacher · Anganwadi Helper · Nodal Teacher</div><div class="flags"><a class="kpi-badge" href="#kpi-k2">FFB · K2 ECCE Personnel</a><a class="op-badge" href="#op-edu">Operational · # Schools with educators</a><a class="op-badge" href="#op-filter">Operational · ECCE Personnel filter</a><span class="flag f-key">Educator vs others decides 1.11–1.13 and Section 2</span></div></div><span class="type ">Single choice</span></div><div class="q" id="q-1-6" data-s="run" data-f="0" data-o="0"><span class="qn">1.6</span><div><div class="qt">Whose Balvatika are you observing today? (First observation: prioritise the Educator’s Balvatika)</div><div class="opts">Anganwadi Worker · ECCE Educator (5-6) · ECCE Educator (3-6) · Nodal Teacher (5-6) · Shiksha Mitra</div></div><span class="type ">Dropdown</span></div><div class="q is-op" id="q-1-7" data-s="run" data-f="0" data-o="1"><span class="qn">1.7</span><div><div class="qt">Total children aged 3-6 enrolled across all Anganwadis in the school</div><div class="flags"><a class="op-badge" href="#op-enrol">Operational · Children enrolled 3-6</a><a class="op-badge" href="#op-att">Operational · Attendance 3-6</a></div></div><span class="type ">Numeric</span></div><div class="q is-op" id="q-1-8" data-s="run" data-f="0" data-o="1"><span class="qn">1.8</span><div><div class="qt">Children aged 3-6 present across all Anganwadis in the school</div><div class="flags"><a class="op-badge" href="#op-att">Operational · Attendance 3-6</a></div></div><span class="type ">Numeric</span></div><div class="q is-kpi" id="q-1-9" data-s="run" data-f="1" data-o="1"><span class="qn">1.9</span><div><div class="qt">Total children aged 5-6 enrolled across all Anganwadis in the school</div><div class="flags"><a class="kpi-badge" href="#kpi-k9">FFB · K9 Enrolment &amp; Attendance</a><a class="op-badge" href="#op-enrol">Operational · Children enrolled 5-6</a><a class="op-badge" href="#op-att">Operational · Attendance 5-6</a><span class="flag f-det">Wording also asks “present”: reword to enrolment only</span></div></div><span class="type ">Numeric</span></div><div class="q is-op" id="q-1-10" data-s="run" data-f="0" data-o="1"><span class="qn">1.10</span><div><div class="qt">Children aged 5-6 present across all Anganwadis in the school</div><div class="flags"><a class="op-badge" href="#op-att">Operational · Attendance 5-6</a></div></div><span class="type ">Numeric</span></div><div class="branch"><span class="cond">If 1.5 = Educator</span><div class="q is-op" id="q-1-11" data-s="edu" data-f="0" data-o="1"><span class="qn">1.11</span><div><div class="qt">Is the Educator teaching any other class apart from the 5-6 years age group?</div><div class="opts">Anganwadi (3-5 years) · Class 1 · Other class · No, teaching only Balvatika</div><div class="flags"><a class="op-badge" href="#op-only">Operational · % Educator teaching only Balvatika</a></div></div><span class="type t-multi">Multi-select</span></div><div class="q is-kpi" id="q-1-12" data-s="edu" data-f="1" data-o="0"><span class="qn">1.12</span><div><div class="qt">Where is the Educator running the Balvatika?</div><div class="opts">In a separate Balvatika room · With Class 1 children · In the co-located Anganwadi · In the verandah · At another location</div><div class="flags"><a class="kpi-badge" href="#kpi-k1">FFB · K1 Learning Space</a></div></div><span class="type ">Single choice</span></div></div><div class="branch"><span class="cond">If 1.5 ≠ Educator</span><div class="q is-kpi" id="q-1-13" data-s="oth" data-f="1" data-o="0"><span class="qn">1.13</span><div><div class="qt">Where is the Anganwadi Worker / Shiksha Mitra / Assistant Teacher / Helper running the Balvatika?</div><div class="opts">In a separate Balvatika room · With Class 1 children · In the co-located Anganwadi · In the verandah · At another location</div><div class="flags"><a class="kpi-badge" href="#kpi-k1">FFB · K1 Learning Space</a></div></div><span class="type ">Single choice</span></div></div><div class="q is-kpi" id="q-1-14" data-s="run" data-f="1" data-o="0"><span class="qn">1.14</span><div><div class="qt">Which learning materials are available in the observed centre?</div><div class="opts">Balvatika Handbook · Chahak 1 · Chahak 2 · Chahak 3 · Kadam · Kalankur · Taalika · Holistic Progress Card</div><div class="flags"><a class="kpi-badge" href="#kpi-k4">FFB · K4 Learning Materials</a></div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-1-15" data-s="run" data-f="0" data-o="0"><span class="qn">1.15</span><div><div class="qt">For what % of children (against enrolment) are workbooks available?</div><div class="opts">&gt;75%, used · &gt;75%, not used · &lt;75%, used · &lt;75%, not used</div></div><span class="type ">Single choice</span></div><div class="q is-kpi" id="q-1-16" data-s="run" data-f="1" data-o="0"><span class="qn">1.16</span><div><div class="qt">Status of learning corners in the observed centre</div><div class="opts">All four corners set up · 2-3 corners set up · Material available, corners not set up · Material not available</div><div class="flags"><a class="kpi-badge" href="#kpi-k3">FFB · K3 Learning Corners</a></div></div><span class="type ">Single choice</span></div><div class="q is-kpi" id="q-1-17" data-s="run" data-f="1" data-o="0"><span class="qn">1.17</span><div><div class="qt">Which TLM and activity materials are available?</div><div class="opts">Wonderbox · Stationery · Big Books · Self-made TLM · None of the above</div><div class="flags"><a class="kpi-badge" href="#kpi-k8">FFB · K8 Wonderbox</a></div></div><span class="type t-multi">Multi-select</span></div><div class="q is-kpi" id="q-1-18" data-s="run" data-f="1" data-o="0"><span class="qn">1.18</span><div><div class="qt">Print-rich environment in the Balvatika</div><div class="opts">Wall charts / paintings · Organised portfolios displayed · Portfolios exist, not organised · No material</div><div class="flags"><a class="kpi-badge" href="#kpi-k6">FFB · K6 Print-rich</a></div></div><span class="type t-multi">Multi-select</span></div><div class="q is-kpi" id="q-1-19" data-s="run" data-f="1" data-o="0"><span class="qn">1.19</span><div><div class="qt">Which infrastructure facilities are available?</div><div class="opts">Outdoor play material · CFF (child-friendly furniture) · Foam mats / durrie · Child-friendly handwash unit · Child-friendly toilet · None of these</div><div class="flags"><a class="kpi-badge" href="#kpi-k5">FFB · K5 Furniture</a><a class="kpi-badge" href="#kpi-k7">FFB · K7 Outdoor Play</a><a class="kpi-badge" href="#kpi-k10">FFB · K10 WASH</a></div></div><span class="type t-multi">Multi-select</span></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">02</div><div><div class="stitle">Section 2 · Classroom observation</div><div class="smeta">15 minutes · 8 questions · 5 always asked, 3 conditional</div></div></div><div class="sbody"><div class="branch"><span class="cond">If 1.5 = Educator</span><div class="q" id="q-2-1" data-s="edu" data-f="0" data-o="0"><span class="qn">2.1</span><div><div class="qt">Which unit of the Handbook is being taught?</div><div class="opts">Unit 1–9 · NA</div></div><span class="type ">Single choice</span></div><div class="q" id="q-2-2" data-s="edu" data-f="0" data-o="0"><span class="qn">2.2</span><div><div class="qt">Which day of the unit is being taught? (skip if 2.1 = NA)</div><div class="opts">Day 1–20 · NA</div></div><span class="type ">Dropdown</span></div></div><div class="q" id="q-2-3" data-s="run" data-f="0" data-o="0"><span class="qn">2.3</span><div><div class="qt">Which domain does the activity being conducted relate to? (skip if 2.2 = NA)</div><div class="opts">Welcome time · Free play · Socio-emotional · Phonological and language · Cognitive · Aesthetic · Physical · No cycle being conducted</div></div><span class="type t-multi">Multi-select</span></div><div class="branch"><span class="cond">If 1.5 = Educator</span><div class="q" id="q-2-4" data-s="edu" data-f="0" data-o="0"><span class="qn">2.4</span><div><div class="qt">Is teaching happening as per the Balvatika Handbook?</div><div class="opts">No · Partially · Fully · Yes, with some new activities</div></div><span class="type ">Single choice</span></div></div><div class="q" id="q-2-5" data-s="run" data-f="0" data-o="0"><span class="qn">2.5</span><div><div class="qt">How many children are actively participating in the activity?</div><div class="opts">&gt;80% · 50-80% · 20-50% · &lt;20% · 0%</div></div><span class="type ">Single choice</span></div><div class="q" id="q-2-6" data-s="run" data-f="0" data-o="0"><span class="qn">2.6</span><div><div class="qt">Which TLMs are being used during the activity?</div><div class="opts">Jadui Pitara / Wonderbox · Self-made / from outside · No TLM used · TLM not needed</div></div><span class="type t-multi">Multi-select</span></div><div class="q" id="q-2-7" data-s="run" data-f="0" data-o="0"><span class="qn">2.7</span><div><div class="qt">Where is children’s regular assessment recorded?</div><div class="opts">Register and Taalika · Only register · Only Taalika · Not recorded</div></div><span class="type ">Single choice</span></div><div class="q" id="q-2-8" data-s="run" data-f="0" data-o="0"><span class="qn">2.8</span><div><div class="qt">Is assessment being recorded in the Holistic Progress Card?</div><div class="opts">All children (Sept) · Some children (Sept) · Not recorded</div></div><span class="type ">Single choice</span></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">03</div><div><div class="stitle">Section 3 · SPOT assessment</div><div class="smeta">15 minutes · questions to be added</div></div></div><div class="sbody"><div class="placeholder"><b>Questions still to be added.</b> When they are, the app should store a start and end time for this section (or per child assessed). These timestamps feed <a class="op-badge" href="#op-time">Operational · Avg time per assessment</a></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">04</div><div><div class="stitle">Section 4 · Questions for the Head Master</div><div class="smeta">5 minutes · 6 questions · 5 always asked, 1 conditional · <b style="color:var(--teal)">1 feed operational</b></div></div></div><div class="sbody"><div class="q" id="q-4-1" data-s="run" data-f="0" data-o="0"><span class="qn">4.1</span><div><div class="qt">Did the HM inspect the Balvatika last week and record it in the teacher diary?</div><div class="opts">Inspected and recorded · Inspected, not recorded · Not inspected</div></div><span class="type ">Single choice</span></div><div class="q" id="q-4-2" data-s="run" data-f="0" data-o="0"><span class="qn">4.2</span><div><div class="qt">Which unit is the Educator / Worker currently on? What materials have been provided?</div><div class="opts">Unit number + short answer</div></div><span class="type ">Descriptive</span></div><div class="q" id="q-4-3" data-s="run" data-f="0" data-o="0"><span class="qn">4.3</span><div><div class="qt">Has the HM entered Anganwadi information in the UDISE+ school profile?</div><div class="opts">Yes · No</div></div><span class="type t-yn">Yes / No</span></div><div class="q" id="q-4-4" data-s="run" data-f="0" data-o="0"><span class="qn">4.4</span><div><div class="qt">Has the HM provided these materials to the Anganwadi?</div><div class="opts">Stationery-related · Learning corner-related · Both · None</div></div><span class="type ">Single choice</span></div><div class="branch"><span class="cond">If 4.4 ≠ None</span><div class="q" id="q-4-5" data-s="run" data-f="0" data-o="0"><span class="qn">4.5</span><div><div class="qt">Has this been entered on the DCF Prerna Portal?</div><div class="opts">Yes · No</div></div><span class="type t-yn">Yes / No</span></div></div><div class="q is-op" id="q-4-6" data-s="run" data-f="0" data-o="1"><span class="qn">4.6</span><div><div class="qt">Is teaching done through play-based activities for at least 3 hours every day?</div><div class="opts">Yes · No</div><div class="flags"><a class="op-badge" href="#op-play">Operational · 3+ hrs play-based teaching</a></div></div><span class="type t-yn">Yes / No</span></div></div></div><div class="arrow"></div><div class="section"><div class="shead"><div class="step">05</div><div><div class="stitle">Section 5 · Closing</div><div class="smeta">ARP remarks · 1 questions · 1 always asked, 0 conditional</div></div></div><div class="sbody"><div class="q" id="q-5-1" data-s="run" data-f="0" data-o="0"><span class="qn">5.1</span><div><div class="qt">ARP’s closing remarks</div><div class="opts">Short answer (100 words)</div></div><span class="type ">Descriptive</span></div></div></div><div class="arrow"></div><div class="node"><div class="pill-node end">Review and submit → data flows to both dashboards</div></div></div>
+</section>
+
+<section id="ffb" class="block">
+  <div class="eyebrow">3 · FFB KPIs</div><h2>Fully Functional Balvatika: 10 KPIs</h2><div class="yrule"></div>
+  <p class="lead">Each KPI is Yes or No for a running centre. There are no scores or weights. For multi-select questions, one ✓ option is enough. 1.11 (other classes the Educator teaches) and 4.6 (3 hours of play) are not part of FFB.</p>
+  <table class="tbl"><thead><tr><th>FFB KPI</th><th>Question</th><th>Counts as Yes when</th><th>Rule source</th></tr></thead><tbody><tr><td class="l"><a href="#kpi-k1"><b>K1. Dedicated &amp; Safe Learning Space</b></a></td><td class="l"><a class="qref" href="#q-1-12">1.12</a> + <a class="qref" href="#q-1-13">1.13</a></td><td class="small l">Yes if the location is any option except “At another location”.</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k2"><b>K2. ECCE Personnel</b></a></td><td class="l"><a class="qref" href="#q-1-5">1.5</a></td><td class="small l">Yes if the Balvatika is run by an Educator, Assistant Teacher or Nodal Teacher.</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k3"><b>K3. Four Functional Learning Corners</b></a></td><td class="l"><a class="qref" href="#q-1-16">1.16</a></td><td class="small l">Yes only if all four corners are set up.</td><td class="c small">Assumed (FFBV blank)</td></tr><tr><td class="l"><a href="#kpi-k4"><b>K4. Age-Appropriate Learning Materials</b></a></td><td class="l"><a class="qref" href="#q-1-14">1.14</a></td><td class="small l">Count the titles ticked. Yes if 4 or more of the 8 are available; no single title is required.</td><td class="c small">FFBV column (≥4)</td></tr><tr><td class="l"><a href="#kpi-k5"><b>K5. Child-Friendly Furniture</b></a></td><td class="l"><a class="qref" href="#q-1-19">1.19</a></td><td class="small l">Yes if CFF or foam mats / durrie is ticked (either is enough).</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k6"><b>K6. Print-Rich Environment, TLM &amp; Portfolio</b></a></td><td class="l"><a class="qref" href="#q-1-18">1.18</a></td><td class="small l">Yes if at least one option other than “No material” is ticked.</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k7"><b>K7. Play &amp; Outdoor Facilities</b></a></td><td class="l"><a class="qref" href="#q-1-19">1.19</a></td><td class="small l">Yes if outdoor play material is ticked.</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k8"><b>K8. Wonder Box / Jadui Pitara</b></a></td><td class="l"><a class="qref" href="#q-1-17">1.17</a></td><td class="small l">Yes if Wonderbox is ticked.</td><td class="c small">FFBV column</td></tr><tr><td class="l"><a href="#kpi-k9"><b>K9. Enrolment &amp; Attendance</b></a></td><td class="l"><a class="qref" href="#q-1-9">1.9</a></td><td class="small l">Yes if 5-6 yr enrolment is more than 5. Attendance (1.10 ÷ 1.9) is shown on the operational dashboard, not scored.</td><td class="c small">CSF rule</td></tr><tr><td class="l"><a href="#kpi-k10"><b>K10. Child-Friendly WASH</b></a></td><td class="l"><a class="qref" href="#q-1-19">1.19</a></td><td class="small l">Yes if a child-friendly handwash unit or toilet is ticked (either is enough).</td><td class="c small">Assumed (FFBV blank)</td></tr>
+  <tr class="tot"><td class="l">Fully Functional</td><td class="l">K1–K10</td><td class="l">All 10 KPIs are Yes in the same visit</td><td class="c">—</td></tr></tbody></table>
+</section>
+
+<section id="ffbdetail" class="block">
+  <div class="eyebrow">4 · FFB logic</div><h2>Which options count as Yes</h2><div class="yrule"></div>
+  <div class="kpis"><article class="kpi" id="kpi-k1"><div class="kpi-h"><div><div class="kpi-name">K1. Dedicated &amp; Safe Learning Space</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-12">1.12</a> + <a class="qref" href="#q-1-13">1.13</a><span>Where is the Balvatika being run? (1.12 for Educator-run, 1.13 otherwise)</span></div><div class="kq-where">Asked in: Section 1 · after 1.5</div><table class="opt-tbl"><tbody><tr><td>In a separate Balvatika room</td><td class="yn-y">✓ Yes</td></tr><tr><td>With Class 1 children</td><td class="yn-y">✓ Yes</td></tr><tr><td>In the co-located Anganwadi</td><td class="yn-y">✓ Yes</td></tr><tr><td>In the verandah</td><td class="yn-y">✓ Yes</td></tr><tr><td>At another location</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if the location is any option except “At another location”. Aggregate: running centres with K1 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k2"><div class="kpi-h"><div><div class="kpi-name">K2. ECCE Personnel</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-5">1.5</a><span>Who is mainly running the Balvatika?</span></div><div class="kq-where">Asked in: Section 1 · running centres</div><table class="opt-tbl"><tbody><tr><td>Educator</td><td class="yn-y">✓ Yes</td></tr><tr><td>Assistant Teacher</td><td class="yn-y">✓ Yes</td></tr><tr><td>Nodal Teacher</td><td class="yn-y">✓ Yes</td></tr><tr><td>Anganwadi Worker</td><td class="yn-n">✗ No</td></tr><tr><td>Shiksha Mitra</td><td class="yn-n">✗ No</td></tr><tr><td>Anganwadi Helper</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if the Balvatika is run by an Educator, Assistant Teacher or Nodal Teacher. Aggregate: running centres with K2 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k3"><div class="kpi-h"><div><div class="kpi-name">K3. Four Functional Learning Corners</div><div class="kpi-scope">Running centres · rule: Assumed (FFBV blank)</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-16">1.16</a><span>Status of learning corners in the observed centre</span></div><div class="kq-where">Asked in: Section 1 · running centres</div><table class="opt-tbl"><tbody><tr><td>All four corners set up in an organised way</td><td class="yn-y">✓ Yes</td></tr><tr><td>2-3 corners set up in an organised way</td><td class="yn-n">✗ No</td></tr><tr><td>Material available, corners not set up</td><td class="yn-n">✗ No</td></tr><tr><td>Material for corners not available</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes only if all four corners are set up. Aggregate: running centres with K3 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k4"><div class="kpi-h"><div><div class="kpi-name">K4. Age-Appropriate Learning Materials</div><div class="kpi-scope">Running centres · rule: FFBV column (≥4)</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-14">1.14</a><span>Which learning materials are available? (8 titles)</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>Any 4 or more of the 8 titles ticked</td><td class="yn-y">✓ Yes</td></tr><tr><td>3 or fewer titles ticked</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Count the titles ticked. Yes if 4 or more of the 8 are available; no single title is required. Aggregate: running centres with K4 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k5"><div class="kpi-h"><div><div class="kpi-name">K5. Child-Friendly Furniture</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-19">1.19</a><span>Which infrastructure facilities are available?</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>CFF (child-friendly furniture)</td><td class="yn-y">✓ Yes</td></tr><tr><td>Foam mats / durrie</td><td class="yn-y">✓ Yes</td></tr><tr><td>Any other 1.19 option, or None of these</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if CFF or foam mats / durrie is ticked (either is enough). Aggregate: running centres with K5 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k6"><div class="kpi-h"><div><div class="kpi-name">K6. Print-Rich Environment, TLM &amp; Portfolio</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-18">1.18</a><span>Print-rich environment in the Balvatika</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>Charts / paintings on the wall</td><td class="yn-y">✓ Yes</td></tr><tr><td>Organised child portfolios displayed</td><td class="yn-y">✓ Yes</td></tr><tr><td>Portfolios exist, not organised</td><td class="yn-y">✓ Yes</td></tr><tr><td>No material</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if at least one option other than “No material” is ticked. Aggregate: running centres with K6 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k7"><div class="kpi-h"><div><div class="kpi-name">K7. Play &amp; Outdoor Facilities</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-19">1.19</a><span>Which infrastructure facilities are available?</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>Outdoor play material</td><td class="yn-y">✓ Yes</td></tr><tr><td>Any other 1.19 option, or None of these</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if outdoor play material is ticked. Aggregate: running centres with K7 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k8"><div class="kpi-h"><div><div class="kpi-name">K8. Wonder Box / Jadui Pitara</div><div class="kpi-scope">Running centres · rule: FFBV column</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-17">1.17</a><span>Which TLM and activity materials are available?</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>Wonderbox</td><td class="yn-y">✓ Yes</td></tr><tr><td>Stationery</td><td class="yn-n">✗ No</td></tr><tr><td>Big Books</td><td class="yn-n">✗ No</td></tr><tr><td>Self-made TLM</td><td class="yn-n">✗ No</td></tr><tr><td>None of the above</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if Wonderbox is ticked. Aggregate: running centres with K8 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k9"><div class="kpi-h"><div><div class="kpi-name">K9. Enrolment &amp; Attendance</div><div class="kpi-scope">Running centres · rule: CSF rule</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-9">1.9</a><span>Number of children aged 5-6 enrolled</span></div><div class="kq-where">Asked in: Section 1 · running centres · numeric</div><table class="opt-tbl"><tbody><tr><td>More than 5</td><td class="yn-y">✓ Yes</td></tr><tr><td>5 or fewer</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if 5-6 yr enrolment is more than 5. Attendance (1.10 ÷ 1.9) is shown on the operational dashboard, not scored. Aggregate: running centres with K9 = Yes ÷ running centres.</div></article><article class="kpi" id="kpi-k10"><div class="kpi-h"><div><div class="kpi-name">K10. Child-Friendly WASH</div><div class="kpi-scope">Running centres · rule: Assumed (FFBV blank)</div></div><div class="kpi-w"><span>Yes / No</span></div></div><div class="kq"><div class="kq-h"><a class="qref" href="#q-1-19">1.19</a><span>Which infrastructure facilities are available?</span></div><div class="kq-where">Asked in: Section 1 · running centres · multi-select</div><table class="opt-tbl"><tbody><tr><td>Child-friendly handwash unit</td><td class="yn-y">✓ Yes</td></tr><tr><td>Child-friendly toilet</td><td class="yn-y">✓ Yes</td></tr><tr><td>Any other 1.19 option, or None of these</td><td class="yn-n">✗ No</td></tr></tbody></table></div><div class="kpi-f"><b>Logic:</b> Yes if a child-friendly handwash unit or toilet is ticked (either is enough). Aggregate: running centres with K10 = Yes ÷ running centres.</div></article></div>
+  <div class="formula" style="margin-top:18px"><b>Aggregation (block · district · state)</b> &nbsp; KPI % = running centres with KPI = Yes ÷ running centres &nbsp;·&nbsp; Fully Functional # = count of FFB centres, % = ÷ running centres &nbsp;·&nbsp; Avg KPIs met = Σ KPIs met ÷ running centres</div>
+</section>
+
+<section id="b-example" class="block">
+  <div class="eyebrow">5 · Worked example</div><h2>One school, scored</h2><div class="yrule"></div>
+  <p class="lead">A running centre run by an Educator, with these answers:</p>
+  <table class="tbl"><thead><tr><th>FFB KPI</th><th>Answer selected</th><th>Result</th></tr></thead><tbody><tr><td class="l"><b>K1. Dedicated &amp; Safe Learning Space</b></td><td class="small l">1.13: In the co-located Anganwadi</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K2. ECCE Personnel</b></td><td class="small l">1.5: Educator</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K3. Four Functional Learning Corners</b></td><td class="small l">1.16: 2-3 corners set up</td><td class="c"><span class=no>✗ No</span></td></tr><tr><td class="l"><b>K4. Age-Appropriate Learning Materials</b></td><td class="small l">1.14: 6 of 8 titles ticked</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K5. Child-Friendly Furniture</b></td><td class="small l">1.19: Foam mats / durrie</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K6. Print-Rich Environment, TLM &amp; Portfolio</b></td><td class="small l">1.18: Wall charts / paintings</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K7. Play &amp; Outdoor Facilities</b></td><td class="small l">1.19: Outdoor play material</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K8. Wonder Box / Jadui Pitara</b></td><td class="small l">1.17: Wonderbox, Stationery</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K9. Enrolment &amp; Attendance</b></td><td class="small l">1.9: 12 children aged 5-6</td><td class="c"><span class=ok>✓ Yes</span></td></tr><tr><td class="l"><b>K10. Child-Friendly WASH</b></td><td class="small l">1.19: Child-friendly toilet</td><td class="c"><span class=ok>✓ Yes</span></td></tr>
+  <tr class="tot"><td class="l">Verdict</td><td class="l">9 of 10 KPIs met (fails K3)</td><td class="c"><span class="bnd b-orange">Not Fully Functional</span></td></tr></tbody></table>
+</section>
+
+<section id="ops" class="block">
+  <div class="eyebrow">6 · Operational KPIs</div><h2>Operational dashboard logic</h2><div class="yrule"></div>
+  <p class="lead">Shown district-wise, block-wise and school-wise with the same filters as the FFB dashboard. # Visits and the time averages use every visit in the period; all other KPIs use each school’s latest visit.</p>
+  <table class="tbl"><thead><tr><th>KPI</th><th>Source</th><th>School level</th><th>Block · district · state</th><th>Base</th><th>Shown as</th></tr></thead><tbody><tr id="op-visits"><td class="l"><b># Schools</b></td><td class="l">Master list</td><td class="small l">—</td><td class="small l">Schools in the Balvatika master list in scope (after area type)</td><td class="small c">—</td><td class="c small">Count</td></tr><tr><td class="l"><b># Visits</b></td><td class="l">Visit records (V1, V2)</td><td class="small l">Visits to the school in the period</td><td class="small l">Count of all visit records in the period (repeat visits included)</td><td class="small c">—</td><td class="c small">Count</td></tr><tr><td class="l"><b># Unique schools visited</b></td><td class="l">UDISE (V1)</td><td class="small l">Visited Yes / No</td><td class="small l">Count of distinct UDISE codes with a visit · coverage % = ÷ # Schools</td><td class="small c"># Schools</td><td class="c small">Count + %</td></tr><tr id="op-running"><td class="l"><b># Running schools</b></td><td class="l"><a class="qref" href="#q-1-3">1.3</a></td><td class="small l">1.3 on the latest visit</td><td class="small l">Count of schools whose latest visit has 1.3 = Yes · % = ÷ unique schools visited</td><td class="small c">Unique schools visited</td><td class="c small">Count + %</td></tr><tr id="op-edu"><td class="l"><b># Schools with educators</b></td><td class="l"><a class="qref" href="#q-1-5">1.5</a></td><td class="small l">1.5 = Educator</td><td class="small l">Count of running schools with 1.5 = Educator · % = ÷ running schools</td><td class="small c">Running schools</td><td class="c small">Count + %</td></tr><tr id="op-time"><td class="l"><b>Avg time per visit</b></td><td class="l">V3 (form start, submit)</td><td class="small l">Average of the school’s visit durations</td><td class="small l">Σ (submit − start) ÷ visits · exclude visits over 3 hours · flag visits under 10 minutes · median on hover</td><td class="small c">All visits in the period</td><td class="c small">Minutes</td></tr><tr><td class="l"><b>Avg time per assessment</b></td><td class="l">Section 3 start / end</td><td class="small l">Average SPOT duration</td><td class="small l">Σ (SPOT end − SPOT start) ÷ visits with SPOT done</td><td class="small c">Running-centre visits</td><td class="c small">Minutes</td></tr><tr id="op-only"><td class="l"><b>% Educator teaching only Balvatika</b></td><td class="l"><a class="qref" href="#q-1-11">1.11</a></td><td class="small l">1.11 = “No, teaching only Balvatika”</td><td class="small l">Educator-run centres with that option ÷ educator-run centres · drill shows all 4 options</td><td class="small c">Schools with educators</td><td class="c small">%</td></tr><tr id="op-enrol"><td class="l"><b>Children enrolled 3-6 / 5-6</b></td><td class="l"><a class="qref" href="#q-1-7">1.7</a> / <a class="qref" href="#q-1-9">1.9</a></td><td class="small l">Number entered</td><td class="small l">Σ over running schools · average = ÷ running schools</td><td class="small c">Running schools</td><td class="c small">Total + avg</td></tr><tr id="op-att"><td class="l"><b>Attendance 3-6 / 5-6</b></td><td class="l"><a class="qref" href="#q-1-8">1.8</a> ÷ <a class="qref" href="#q-1-7">1.7</a> · <a class="qref" href="#q-1-10">1.10</a> ÷ <a class="qref" href="#q-1-9">1.9</a></td><td class="small l">Present ÷ enrolled</td><td class="small l">Σ present ÷ Σ enrolled (pooled, not an average of school rates)</td><td class="small c">Children enrolled</td><td class="c small">%</td></tr><tr id="op-play"><td class="l"><b>3+ hrs play-based teaching</b></td><td class="l"><a class="qref" href="#q-4-6">4.6</a></td><td class="small l">4.6 = Yes</td><td class="small l">Running schools with 4.6 = Yes ÷ running schools</td><td class="small c">Running schools</td><td class="c small">%</td></tr></tbody></table>
+  <div class="issues" style="margin-top:16px">
+    <div class="issue"><span>!</span><div><b>Timestamps needed from the app</b><p>Avg time per visit needs the form start time and submit time on every record. Avg time per assessment needs start and end times for Section 3 (SPOT). Neither is in the current export.</p></div></div>
+    <div class="issue" id="op-filter"><span>i</span><div><b>ECCE Personnel filter (1.5)</b><p>Combined (default): all schools. Educator only: running centres with 1.5 = Educator. Others only: running with any other role. Non-running centres appear only under Combined, because 1.5 is asked only when the centre is running.</p></div></div>
+  </div>
+</section>
+
+<section id="rules" class="block">
+  <div class="eyebrow">7 · Counting rules</div><h2>Rules that apply to both dashboards</h2><div class="yrule"></div>
+  <table class="tbl"><thead><tr><th>Rule</th><th>Definition</th></tr></thead><tbody>
+  <tr><td class="l"><b>Unit of analysis</b></td><td class="l">One record per school per month: its latest visit (by visit date, then submission time). “All months” = latest visit in the year.</td></tr>
+  <tr><td class="l"><b>Order of filters</b></td><td class="l">District / block / area type → year and month → latest visit per school → ECCE personnel.</td></tr>
+  <tr><td class="l"><b>Running centres</b></td><td class="l">Schools whose latest visit has 1.3 = Yes. Base for every FFB KPI and most operational KPIs.</td></tr>
+  <tr><td class="l"><b>Educator-run centres</b></td><td class="l">Running centres with 1.5 = Educator. Base for 1.11.</td></tr>
+  <tr><td class="l"><b>Learning space field</b></td><td class="l">1.12 (Educator-run) and 1.13 (others) combined into one field for K1.</td></tr>
+  <tr><td class="l"><b>Roll-up</b></td><td class="l">Block, district and state values are computed from school records directly: count ÷ count, Σ ÷ Σ. Never average lower-level percentages.</td></tr>
+  <tr><td class="l"><b>Schools not visited</b></td><td class="l">Excluded from every % except coverage.</td></tr>
+  </tbody></table>
+</section>
+
+<section id="b-open" class="block">
+  <div class="eyebrow">8 · Open points</div><h2>To confirm before the build</h2><div class="yrule"></div>
+  <div class="issues">
+    <div class="issue"><span>1</span><div><b>K1: co-located Anganwadi</b><p>The FFBV column passes “In the co-located Anganwadi” and “In the verandah”. An earlier CSF rule failed the co-located Anganwadi. 1.13 has no FFBV rule; the 1.12 rule is applied.</p></div></div>
+    <div class="issue"><span>2</span><div><b>K3: learning corners</b><p>FFBV column is blank. This page counts only “All four corners” as Yes.</p></div></div>
+    <div class="issue"><span>3</span><div><b>K10: WASH</b><p>FFBV column is blank. Handwash unit <b>or</b> toilet counts as Yes.</p></div></div>
+    <div class="issue"><span>4</span><div><b>1.9 wording</b><p>1.9 asks for enrolled “and present” 5-6 children, and 1.10 asks for present again. Reword 1.9 to enrolment only so K9 and attendance are reliable.</p></div></div>
+    <div class="issue"><span>5</span><div><b>Branching after 1.3 = No</b><p>The checklist note to close the form sits on 1.5’s row. This page assumes the form closes right after 1.4.</p></div></div>
+    <div class="issue"><span>6</span><div><b>Section 3 (SPOT)</b><p>No questions yet, so no KPI uses it. Add start and end timestamps when it is built.</p></div></div>
+    <div class="issue"><span>7</span><div><b>Enrolment vs observed centre</b><p>1.7–1.10 cover all Anganwadis in the school, while observation questions cover the one Balvatika named in 1.6. In schools with more than one centre, K9 and the other KPIs describe different units.</p></div></div>
+    <div class="issue"><span>8</span><div><b>Blank answers</b><p>Proposed: a blank answer for a running centre makes the KPI No and is flagged for data quality.</p></div></div>
+  </div>
+</section>
+
+</div></main>
+<footer>Central Square Foundation · UP SPMU · Source: Balvatika Supportive Supervision Checklist (revised, English) and FFB scoring decisions to 28 Oct 2026</footer>
+
+</div>
+<script>
+(function(){
+  var f=document.getElementById('filters'); if(!f) return; f.hidden=false;
+  var st={type:'all',pm:false,k:false};
+  function apply(){
+    var up=st.type==='UPS'||st.type==='Composite';
+    document.querySelectorAll('#chart .q').forEach(function(el){
+      var na=false;
+      if(st.type!=='all'){
+        if(el.dataset.ups==='1'&&st.type==='UPS') na=true;
+        if(el.dataset.g==='pm'&&!st.pm) na=true;
+        if(el.dataset.g==='up'&&!up) na=true;
+      }
+      if(st.k&&!el.classList.contains('is-kpi')) na=true;
+      el.classList.toggle('na',na);
+    });
+    document.querySelectorAll('#chart .lane').forEach(function(l){
+      var d=st.type!=='all'&&(l.dataset.lane==='pm'?!st.pm:!up); l.classList.toggle('dim',d);
+    });
+  }
+  f.querySelectorAll('.seg button').forEach(function(b){b.addEventListener('click',function(){
+    st.type=b.dataset.v; f.querySelectorAll('.seg button').forEach(function(x){x.classList.toggle('on',x===b)}); apply();});});
+  document.getElementById('pm').addEventListener('change',function(e){st.pm=e.target.checked;apply();});
+  document.getElementById('kOnly').addEventListener('change',function(e){st.k=e.target.checked;apply();});
+})();
+</script>
+<script>
+(function(){
+  var f=document.getElementById('b-filters'); if(!f) return; f.hidden=false;
+  var st={p:'all',f:false,o:false};
+  var allow={all:null, edu:['always','run','edu'], oth:['always','run','oth'], notrun:['always','notrun']};
+  function apply(){
+    document.querySelectorAll('#b-chart .q').forEach(function(el){
+      var na=false, a=allow[st.p];
+      if(a && a.indexOf(el.dataset.s)<0) na=true;
+      if(st.f && el.dataset.f!=='1') na=true;
+      if(st.o && el.dataset.o!=='1') na=true;
+      el.classList.toggle('na',na);
+    });
+    document.querySelectorAll('#b-chart .section').forEach(function(s){
+      var qs=s.querySelectorAll('.q'); if(!qs.length) { s.classList.toggle('dim', st.p==='notrun'); return; }
+      var any=[].some.call(qs,function(q){return !q.classList.contains('na');}); s.classList.toggle('dim',!any);
+    });
+  }
+  f.querySelectorAll('.seg button').forEach(function(b){b.addEventListener('click',function(){
+    st.p=b.dataset.v; f.querySelectorAll('.seg button').forEach(function(x){x.classList.toggle('on',x===b)}); apply();});});
+  document.getElementById('fOnly').addEventListener('change',function(e){st.f=e.target.checked;apply();});
+  document.getElementById('oOnly').addEventListener('change',function(e){st.o=e.target.checked;apply();});
+})();
+</script>
+<script>
+(function(){
+  function show(a, keepScroll){
+    document.getElementById('app-g').hidden = a!=='g';
+    document.getElementById('app-b').hidden = a!=='b';
+    document.querySelectorAll('.switch button').forEach(function(b){ b.classList.toggle('on', b.dataset.app===a); });
+    if(!keepScroll) window.scrollTo(0,0);
+  }
+  document.querySelectorAll('.switch button').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.app); history.replaceState(null,'', b.dataset.app==='b'?'#balvatika':'#gunvatta'); }); });
+  var h = location.hash.slice(1);
+  if (h==='balvatika') show('b'); else if (h && document.getElementById(h)) { show(document.getElementById('app-b').contains(document.getElementById(h))?'b':'g', true); }
+})();
+</script>
+</body></html>
